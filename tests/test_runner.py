@@ -40,5 +40,25 @@ def test_short_context_prompt_trims_turns():
     )
 
     assert "TRANSCRIPT" in prompt
+    assert "RELEVANT_FACTS:" in prompt
+    assert "Prefer newer corrected facts" in prompt
     assert prompt_metadata["included_turns"] < len(example.conversation)
     assert memory_trace is None
+
+
+def test_memory_prompt_uses_shared_answer_scaffold(tmp_path: Path):
+    path = tmp_path / "sample.jsonl"
+    rows = generate_dataset(examples=1, seed=7)
+    write_dataset(rows, path)
+    example = rows[0]
+
+    prompt, _, _ = _build_mode_prompt(
+        example=example,
+        mode="memory_enabled",
+        short_context_tokens=8000,
+        full_context_budget=250000,
+    )
+
+    assert "RELEVANT_FACTS:" in prompt
+    assert "ANSWER:" in prompt
+    assert "Prefer newer corrected facts" in prompt

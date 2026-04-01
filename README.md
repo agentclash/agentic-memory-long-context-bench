@@ -45,6 +45,13 @@ Headline results from that run:
 - `memory_enabled` used `289.2` average prompt tokens vs `162590.2` for `full_context`
 - `memory_enabled` cost about `152.2x` less per example than `full_context`
 
+Important caveat:
+
+- the current `12`-example run is a pilot, not the final public benchmark
+- the report now includes confidence intervals and should be interpreted as directional evidence
+- the next benchmark target should be at least `100` examples total, with `20+` examples per scenario family
+- for tighter 95% pass-rate intervals around `+/-5` percentage points, target roughly `385-400` examples total
+
 ## Dataset Design
 
 Each example is a long conversation with:
@@ -207,6 +214,15 @@ The `memory_enabled` mode explicitly uses:
 - procedural memory for prior successful procedures
 
 and records the retrieved memory traces in the output JSONL.
+
+The transcript-based modes and memory-based mode now share the same answer scaffold:
+
+- identify relevant facts first
+- prefer newer corrected facts over stale ones
+- avoid repeating already-tried troubleshooting steps
+- return `RELEVANT_FACTS` followed by `ANSWER`
+
+That change makes the `full_context` baseline meaningfully fairer than raw transcript stuffing for the next benchmark rerun.
 
 Each run gets its own folder, for example:
 

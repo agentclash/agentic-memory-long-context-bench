@@ -134,7 +134,11 @@ def _format_memory_prompt(
 
     return (
         "You are evaluating long-context memory retrieval quality.\n"
-        "Use only the relevant memory evidence below.\n\n"
+        "Use only the memory evidence below.\n"
+        "First identify the facts directly relevant to the task.\n"
+        "Prefer newer corrected facts over older stale facts.\n"
+        "Do not suggest troubleshooting steps the user already tried.\n"
+        "Ignore irrelevant memory items.\n\n"
         f"TASK:\n{example.task.prompt}\n\n"
         "SEMANTIC MEMORY:\n"
         f"{semantic_lines}\n\n"
@@ -144,7 +148,12 @@ def _format_memory_prompt(
         f"{episodic_recent_lines}\n\n"
         "PROCEDURAL MEMORY:\n"
         f"{procedural_lines}\n\n"
-        "Write a concise answer that satisfies the task."
+        "Return this exact structure:\n"
+        "RELEVANT_FACTS:\n"
+        "- fact 1\n"
+        "- fact 2\n"
+        "ANSWER:\n"
+        "your concise final answer"
     )
 
 

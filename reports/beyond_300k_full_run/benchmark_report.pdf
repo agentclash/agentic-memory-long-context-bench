@@ -48,7 +48,7 @@ endobj
 << /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
 endobj
 5 0 obj
-<< /Length 4305 >>
+<< /Length 4945 >>
 stream
 q 1.000 1.000 1.000 rg 0.00 0.00 612.00 792.00 re f Q
 BT /F2 24 Tf 0.080 0.130 0.240 rg 1 0 0 1 54.00 740.00 Tm (Mode Comparison) Tj ET
@@ -99,6 +99,11 @@ BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 310.00 Tm (Recommended Next Step
 BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 286.00 Tm (Tune the memory-mode answer scaffold so Gemini is required to explicitly cover) Tj ET
 BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 270.00 Tm (every gold constraint that appears in retrieved memory. That should push the) Tj ET
 BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 254.00 Tm (pass rate higher without giving up the cost and latency advantage.) Tj ET
+BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 214.00 Tm (Sample Size Note) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 190.00 Tm (This 12-example run is a pilot. For a public-facing directional benchmark, the) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 174.00 Tm (next target should be at least 100 total examples, ideally with 20 or more per) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 158.00 Tm (scenario family. For tighter 95% pass-rate intervals near plus or minus 5) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 142.00 Tm (percentage points, target roughly 385 to 400 total examples.) Tj ET
 endstream
 endobj
 6 0 obj
@@ -118,11 +123,11 @@ xref
 0000000160 00000 n 
 0000003206 00000 n 
 0000003342 00000 n 
-0000007699 00000 n 
-0000007835 00000 n 
-0000007898 00000 n 
+0000008339 00000 n 
+0000008475 00000 n 
+0000008538 00000 n 
 trailer
 << /Size 9 /Root 8 0 R >>
 startxref
-7947
+8587
 %%EOF

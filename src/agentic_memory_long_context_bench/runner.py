@@ -306,11 +306,20 @@ def _build_transcript_prompt(example: BenchmarkExample, turns: list[Turn]) -> st
     transcript = "\n".join(f"{turn.role.upper()}: {turn.text}" for turn in turns)
     return (
         "You are evaluating long-context reasoning quality.\n"
-        "Answer the task using only the transcript below.\n\n"
+        "Use only the transcript evidence below.\n"
+        "First identify the facts directly relevant to the task.\n"
+        "Prefer newer corrected facts over older stale facts.\n"
+        "Do not suggest troubleshooting steps the user already tried.\n"
+        "Ignore irrelevant chatter and distractors.\n\n"
         f"TASK:\n{example.task.prompt}\n\n"
         "TRANSCRIPT:\n"
         f"{transcript}\n\n"
-        "Write a concise answer that satisfies the task."
+        "Return this exact structure:\n"
+        "RELEVANT_FACTS:\n"
+        "- fact 1\n"
+        "- fact 2\n"
+        "ANSWER:\n"
+        "your concise final answer"
     )
 
 

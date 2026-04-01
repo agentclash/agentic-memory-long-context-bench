@@ -18,6 +18,14 @@ On >300k-token conversations, agentic-memory retrieval outperformed both short-c
 | `full_context` | 3/12 (25.0%) | 0.4417 | 6952.03 | 162590.2 | $0.049154 |
 | `short_context` | 0/12 (0.0%) | 0.3500 | 3800.70 | 1647.8 | $0.000827 |
 
+## Confidence Intervals
+
+| Mode | 95% Wilson CI For Pass Rate |
+| --- | ---: |
+| `memory_enabled` | 31.9% to 80.7% |
+| `full_context` | 8.9% to 53.2% |
+| `short_context` | 0.0% to 24.2% |
+
 ## Why This Matters
 
 - `memory_enabled` improved pass rate by `33.3` percentage points over `full_context`.
@@ -38,3 +46,10 @@ On >300k-token conversations, agentic-memory retrieval outperformed both short-c
 - Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.
 - Run a second benchmark pass after prompt tuning to see whether memory_enabled can move from 58.3% into the 70-80% range.
 - Add a public-facing chart image or screenshot to the repo README for easier sharing.
+
+## Sample Size Guidance
+
+- The current run is a pilot: `12` examples total.
+- Recommended minimum for a public directional benchmark: `100` examples total, or `20` per scenario family.
+- Recommended stronger target for tighter 95% pass-rate intervals: `385` examples total.
+- Rationale: Around 100 binary-scored examples gives a very rough 95% margin of error of about +/-10 percentage points at worst-case accuracy. Around 385 examples brings that down to about +/-5 percentage points.

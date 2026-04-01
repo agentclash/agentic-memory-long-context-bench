@@ -7,6 +7,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
+import math
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,8 @@ class ModeSummary:
     avg_latency_ms: float
     avg_prompt_tokens: float
     avg_cost_usd: float
+    ci_low: float
+    ci_high: float
 
     def to_dict(self) -> dict[str, float | int | str]:
         return {
@@ -34,6 +37,8 @@ class ModeSummary:
             "avg_latency_ms": round(self.avg_latency_ms, 2),
             "avg_prompt_tokens": round(self.avg_prompt_tokens, 1),
             "avg_cost_usd": round(self.avg_cost_usd, 6),
+            "ci_low": round(self.ci_low, 4),
+            "ci_high": round(self.ci_high, 4),
         }
 
 
@@ -90,6 +95,8 @@ def summarize_rows(rows: list[dict]) -> dict[str, ModeSummary]:
             avg_latency_ms=mean(row["latency_ms"] for row in bucket) if bucket else 0.0,
             avg_prompt_tokens=mean(row["prompt_tokens"] for row in bucket) if bucket else 0.0,
             avg_cost_usd=mean(row["cost_usd"] for row in bucket) if bucket else 0.0,
+            ci_low=_wilson_interval(passed, total)[0],
+            ci_high=_wilson_interval(passed, total)[1],
         )
     return summaries
 
@@ -142,6 +149,16 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
         "max_estimated_transcript_tokens": max_tokens,
         "mode_summaries": {mode: summary.to_dict() for mode, summary in summaries.items()},
         "relative_metrics": relative,
+        "sample_size_guidance": {
+            "current_run_is_pilot": True,
+            "recommended_min_examples_total": 100,
+            "recommended_min_examples_per_family": 20,
+            "recommended_strong_examples_total": 385,
+            "recommended_rationale": (
+                "Around 100 binary-scored examples gives a very rough 95% margin of error of about +/-10 percentage points "
+                "at worst-case accuracy. Around 385 examples brings that down to about +/-5 percentage points."
+            ),
+        },
         "headline": (
             "On >300k-token conversations, agentic-memory retrieval outperformed both short-context and full-context baselines "
             "while using dramatically fewer prompt tokens than transcript stuffing."
@@ -194,6 +211,21 @@ def render_markdown(summary_payload: dict) -> str:
     lines.extend(
         [
             "",
+            "## Confidence Intervals",
+            "",
+            "| Mode | 95% Wilson CI For Pass Rate |",
+            "| --- | ---: |",
+        ]
+    )
+    for mode in ("memory_enabled", "full_context", "short_context"):
+        summary = mode_summaries[mode]
+        lines.append(
+            f"| `{mode}` | {summary['ci_low'] * 100:.1f}% to {summary['ci_high'] * 100:.1f}% |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Why This Matters",
             "",
             f"- `memory_enabled` improved pass rate by `{relative['pass_rate_lift_vs_full_context_pct_points']}` percentage points over `full_context`.",
@@ -214,8 +246,33 @@ def render_markdown(summary_payload: dict) -> str:
         ]
     )
     lines.extend(f"- {step}" for step in summary_payload["next_steps"])
+    lines.extend(
+        [
+            "",
+            "## Sample Size Guidance",
+            "",
+            f"- The current run is a pilot: `{summary_payload['dataset_examples']}` examples total.",
+            f"- Recommended minimum for a public directional benchmark: `{summary_payload['sample_size_guidance']['recommended_min_examples_total']}` examples total, or `{summary_payload['sample_size_guidance']['recommended_min_examples_per_family']}` per scenario family.",
+            f"- Recommended stronger target for tighter 95% pass-rate intervals: `{summary_payload['sample_size_guidance']['recommended_strong_examples_total']}` examples total.",
+            f"- Rationale: {summary_payload['sample_size_guidance']['recommended_rationale']}",
+        ]
+    )
     lines.append("")
     return "\n".join(lines)
+
+
+def _wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    if total == 0:
+        return 0.0, 0.0
+    phat = successes / total
+    denominator = 1 + (z * z / total)
+    center = (phat + (z * z) / (2 * total)) / denominator
+    margin = (
+        z
+        * math.sqrt((phat * (1 - phat) / total) + (z * z) / (4 * total * total))
+        / denominator
+    )
+    return max(0.0, center - margin), min(1.0, center + margin)
 
 
 def write_example_breakdown(*, rows: list[dict], path: Path) -> None:
@@ -451,5 +508,14 @@ def write_pdf_report(*, summary_payload: dict, path: Path) -> None:
         line_height=16,
     )
 
-    canvas.save(path)
+    canvas.text(54, 214, "Sample Size Note", font="F2", size=16, rgb=(0.16, 0.19, 0.26))
+    canvas.wrapped_text(
+        54,
+        190,
+        "This 12-example run is a pilot. For a public-facing directional benchmark, the next target should be at least 100 total examples, ideally with 20 or more per scenario family. For tighter 95% pass-rate intervals near plus or minus 5 percentage points, target roughly 385 to 400 total examples.",
+        width=504,
+        size=12,
+        line_height=16,
+    )
 
+    canvas.save(path)
