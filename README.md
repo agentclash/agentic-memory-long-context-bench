@@ -197,6 +197,25 @@ results/
 
 That makes the output live somewhere clean and resumable.
 
+Generate a report bundle from a completed run:
+
+```bash
+generate-benchmark-report \
+  --results results/benchmark_v1/results.jsonl \
+  --output-dir reports/benchmark_v1
+```
+
+That creates:
+
+```text
+reports/
+└── benchmark_v1/
+    ├── benchmark_report.md
+    ├── benchmark_report.pdf
+    ├── benchmark_summary.json
+    └── example_breakdown.csv
+```
+
 ## Generation Strategy
 
 The generator does not ask an LLM to write the dataset.

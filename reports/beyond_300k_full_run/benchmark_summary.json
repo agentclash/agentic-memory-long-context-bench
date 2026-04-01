@@ -1,0 +1,93 @@
+{
+  "best_memory_examples": [
+    {
+      "example_id": "contradiction_resolution_hard_0002",
+      "judge_score": 1.0,
+      "mode": "memory_enabled",
+      "prompt_tokens": 286,
+      "response_text": "The user is on the enterprise plan."
+    },
+    {
+      "example_id": "procedure_reuse_easy_0003",
+      "judge_score": 1.0,
+      "mode": "memory_enabled",
+      "prompt_tokens": 286,
+      "response_text": "To address the duplicate invoice emails after a subscription migration, consider troubleshooting webhook delivery failures after a billing deployment.\n\nHere are the recommended steps:\n1.  Check the deployment timestamp against the first failed webhook.\n2.  Inspect signature verification settings.\n3.  Replay one failed event in a staging or dry-run environment.\n4.  Escalate with request IDs if signature replay still fails."
+    },
+    {
+      "example_id": "profile_recall_hard_0005",
+      "judge_score": 1.0,
+      "mode": "memory_enabled",
+      "prompt_tokens": 287,
+      "response_text": "Anika is on the enterprise plan, prefers email notifications, and is in the UTC+1 timezone."
+    }
+  ],
+  "context_tier": "beyond_250k",
+  "dataset_examples": 12,
+  "headline": "On >300k-token conversations, agentic-memory retrieval outperformed both short-context and full-context baselines while using dramatically fewer prompt tokens than transcript stuffing.",
+  "judge_model": "gemini-2.5-flash-lite",
+  "key_findings": [
+    "memory_enabled achieved a 7/12 pass rate (58.3%), versus 3/12 (25.0%) for full_context and 0/12 (0.0%) for short_context.",
+    "memory_enabled used 289.2 prompt tokens on average, compared with 162590.2 for full_context.",
+    "memory_enabled was 50.1% faster on average than full_context.",
+    "full_context cost about 152.2x more per example than memory_enabled.",
+    "All three modes recorded a 0.0% hallucination rate under the current must-not-include rules, so the largest separation came from answer completeness and relevance."
+  ],
+  "max_estimated_transcript_tokens": 318090,
+  "min_estimated_transcript_tokens": 301143,
+  "mode_summaries": {
+    "full_context": {
+      "avg_cost_usd": 0.049154,
+      "avg_judge_score": 0.4417,
+      "avg_latency_ms": 6952.03,
+      "avg_prompt_tokens": 162590.2,
+      "hallucination_rate": 0.0,
+      "hallucinations": 0,
+      "mode": "full_context",
+      "pass_rate": 0.25,
+      "passed": 3,
+      "total": 12
+    },
+    "memory_enabled": {
+      "avg_cost_usd": 0.000323,
+      "avg_judge_score": 0.8333,
+      "avg_latency_ms": 3470.32,
+      "avg_prompt_tokens": 289.2,
+      "hallucination_rate": 0.0,
+      "hallucinations": 0,
+      "mode": "memory_enabled",
+      "pass_rate": 0.5833,
+      "passed": 7,
+      "total": 12
+    },
+    "short_context": {
+      "avg_cost_usd": 0.000827,
+      "avg_judge_score": 0.35,
+      "avg_latency_ms": 3800.7,
+      "avg_prompt_tokens": 1647.8,
+      "hallucination_rate": 0.0,
+      "hallucinations": 0,
+      "mode": "short_context",
+      "pass_rate": 0.0,
+      "passed": 0,
+      "total": 12
+    }
+  },
+  "model": "gemini-2.5-flash",
+  "next_steps": [
+    "Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.",
+    "Run a second benchmark pass after prompt tuning to see whether memory_enabled can move from 58.3% into the 70-80% range.",
+    "Add a public-facing chart image or screenshot to the repo README for easier sharing."
+  ],
+  "relative_metrics": {
+    "cost_multiple_full_context_vs_memory": 152.2,
+    "cost_reduction_vs_full_context_pct": 99.3,
+    "latency_reduction_vs_full_context_pct": 50.1,
+    "pass_rate_lift_vs_full_context_pct_points": 33.3,
+    "pass_rate_lift_vs_short_context_pct_points": 58.3,
+    "prompt_token_reduction_vs_full_context_pct": 99.8
+  },
+  "results_path": "/Users/atharva/agentic-memory/agentic-memory-long-context-bench-fix/results/beyond_300k_full_run/results.jsonl",
+  "title": "agentic-memory Beyond-300k Benchmark Report",
+  "total_runs": 36
+}

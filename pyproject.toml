@@ -21,6 +21,7 @@ dev = [
 [project.scripts]
 generate-long-context-dataset = "agentic_memory_long_context_bench.generator:main"
 run-long-context-harness = "agentic_memory_long_context_bench.runner:main"
+generate-benchmark-report = "agentic_memory_long_context_bench.reporting:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
