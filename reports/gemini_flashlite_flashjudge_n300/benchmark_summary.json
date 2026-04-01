@@ -1,0 +1,106 @@
+{
+  "best_memory_examples": [
+    {
+      "example_id": "profile_recall_easy_0000",
+      "judge_score": 1.0,
+      "mode": "memory_enabled",
+      "prompt_tokens": 343,
+      "response_text": "RELEVANT_FACTS:\n- I'm actually on the pro plan.\n- I prefer sms notifications.\n- My timezone is UTC+9.\n- My name is Ivy.\nANSWER:\nIvy is on the pro plan, prefers SMS notifications, and is in the UTC+9 timezone."
+    },
+    {
+      "example_id": "troubleshooting_continuity_medium_0001",
+      "judge_score": null,
+      "mode": "memory_enabled",
+      "prompt_tokens": 347,
+      "response_text": "RELEVANT_FACTS:\n- My issue is a login loop after SSO rotation.\n- I already tried clearing browser cookies and resetting the password.\n- I'm actually on the enterprise plan.\nANSWER:\nThe user is experiencing a login loop after an SSO rotation, and has already attempted clearing browser cookies and resetting the password. The next best action is to re-authenticate the SSO session."
+    },
+    {
+      "example_id": "contradiction_resolution_hard_0002",
+      "judge_score": null,
+      "mode": "memory_enabled",
+      "prompt_tokens": 345,
+      "response_text": "RELEVANT_FACTS:\n- I'm actually on the enterprise plan.\nANSWER:\nYou are currently on the enterprise plan."
+    }
+  ],
+  "context_tier": "beyond_250k",
+  "dataset_examples": 300,
+  "headline": "On >300k-token conversations, agentic-memory retrieval outperformed both short-context and full-context baselines while using dramatically fewer prompt tokens than transcript stuffing.",
+  "judge_model": "gemini-3-flash-preview",
+  "key_findings": [
+    "memory_enabled achieved a 171/300 pass rate (57.0%), versus 72/300 (24.0%) for full_context and 4/300 (1.3%) for short_context.",
+    "memory_enabled used 349.4 prompt tokens on average, compared with 160543.9 for full_context.",
+    "memory_enabled was 58.4% faster on average than full_context.",
+    "full_context cost about 242.5x more per example than memory_enabled.",
+    "Under the current must-not-include rules, stale/forbidden-fact violation rates were 4.0% for memory_enabled, 15.0% for full_context, and 4.0% for short_context."
+  ],
+  "max_estimated_transcript_tokens": 318607,
+  "min_estimated_transcript_tokens": 300040,
+  "mode_summaries": {
+    "full_context": {
+      "avg_cost_usd": 0.016114,
+      "avg_judge_score": 0.3234,
+      "avg_latency_ms": 2511.77,
+      "avg_prompt_tokens": 160543.9,
+      "ci_high": 0.2914,
+      "ci_low": 0.1952,
+      "hallucination_rate": 0.15,
+      "hallucinations": 45,
+      "mode": "full_context",
+      "pass_rate": 0.24,
+      "passed": 72,
+      "total": 300
+    },
+    "memory_enabled": {
+      "avg_cost_usd": 6.6e-05,
+      "avg_judge_score": 0.7338,
+      "avg_latency_ms": 1045.49,
+      "avg_prompt_tokens": 349.4,
+      "ci_high": 0.6248,
+      "ci_low": 0.5134,
+      "hallucination_rate": 0.04,
+      "hallucinations": 12,
+      "mode": "memory_enabled",
+      "pass_rate": 0.57,
+      "passed": 171,
+      "total": 300
+    },
+    "short_context": {
+      "avg_cost_usd": 0.000196,
+      "avg_judge_score": 0.1137,
+      "avg_latency_ms": 979.73,
+      "avg_prompt_tokens": 1718.4,
+      "ci_high": 0.0338,
+      "ci_low": 0.0052,
+      "hallucination_rate": 0.04,
+      "hallucinations": 12,
+      "mode": "short_context",
+      "pass_rate": 0.0133,
+      "passed": 4,
+      "total": 300
+    }
+  },
+  "model": "gemini-2.5-flash-lite",
+  "next_steps": [
+    "Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.",
+    "Run a second benchmark pass after prompt tuning to see whether memory_enabled can move from 58.3% into the 70-80% range.",
+    "Add a public-facing chart image or screenshot to the repo README for easier sharing."
+  ],
+  "relative_metrics": {
+    "cost_multiple_full_context_vs_memory": 242.5,
+    "cost_reduction_vs_full_context_pct": 99.6,
+    "latency_reduction_vs_full_context_pct": 58.4,
+    "pass_rate_lift_vs_full_context_pct_points": 33.0,
+    "pass_rate_lift_vs_short_context_pct_points": 55.7,
+    "prompt_token_reduction_vs_full_context_pct": 99.8
+  },
+  "results_path": "/Users/atharva/agentic-memory/agentic-memory-long-context-bench-fix/results/gemini_flashlite_flashjudge_n300/results.jsonl",
+  "sample_size_guidance": {
+    "current_run_is_pilot": false,
+    "recommended_min_examples_per_family": 20,
+    "recommended_min_examples_total": 100,
+    "recommended_rationale": "Around 100 binary-scored examples gives a very rough 95% margin of error of about +/-10 percentage points at worst-case accuracy. Around 385 examples brings that down to about +/-5 percentage points.",
+    "recommended_strong_examples_total": 385
+  },
+  "title": "agentic-memory n=300 Long-Context Benchmark Report",
+  "total_runs": 900
+}

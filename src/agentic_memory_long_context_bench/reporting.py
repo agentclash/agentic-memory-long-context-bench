@@ -150,7 +150,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
         "mode_summaries": {mode: summary.to_dict() for mode, summary in summaries.items()},
         "relative_metrics": relative,
         "sample_size_guidance": {
-            "current_run_is_pilot": True,
+            "current_run_is_pilot": dataset_examples < 100,
             "recommended_min_examples_total": 100,
             "recommended_min_examples_per_family": 20,
             "recommended_strong_examples_total": 385,
@@ -168,7 +168,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
             f"memory_enabled used {memory.avg_prompt_tokens:.1f} prompt tokens on average, compared with {full.avg_prompt_tokens:.1f} for full_context.",
             f"memory_enabled was {relative['latency_reduction_vs_full_context_pct']:.1f}% faster on average than full_context.",
             f"full_context cost about {relative['cost_multiple_full_context_vs_memory']:.1f}x more per example than memory_enabled.",
-            "All three modes recorded a 0.0% hallucination rate under the current must-not-include rules, so the largest separation came from answer completeness and relevance.",
+            f"Under the current must-not-include rules, stale/forbidden-fact violation rates were {memory.hallucination_rate * 100:.1f}% for memory_enabled, {full.hallucination_rate * 100:.1f}% for full_context, and {short.hallucination_rate * 100:.1f}% for short_context.",
         ],
         "next_steps": [
             "Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.",
@@ -251,7 +251,7 @@ def render_markdown(summary_payload: dict) -> str:
             "",
             "## Sample Size Guidance",
             "",
-            f"- The current run is a pilot: `{summary_payload['dataset_examples']}` examples total.",
+            f"- The current run covers `{summary_payload['dataset_examples']}` examples total.",
             f"- Recommended minimum for a public directional benchmark: `{summary_payload['sample_size_guidance']['recommended_min_examples_total']}` examples total, or `{summary_payload['sample_size_guidance']['recommended_min_examples_per_family']}` per scenario family.",
             f"- Recommended stronger target for tighter 95% pass-rate intervals: `{summary_payload['sample_size_guidance']['recommended_strong_examples_total']}` examples total.",
             f"- Rationale: {summary_payload['sample_size_guidance']['recommended_rationale']}",

@@ -1,0 +1,133 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 3000 >>
+stream
+q 0.980 0.980 0.990 rg 0.00 0.00 612.00 792.00 re f Q
+q 0.080 0.130 0.240 rg 0.00 660.00 612.00 132.00 re f Q
+BT /F2 24 Tf 1.000 1.000 1.000 rg 1 0 0 1 54.00 728.00 Tm (agentic-memory) Tj ET
+BT /F2 28 Tf 1.000 1.000 1.000 rg 1 0 0 1 54.00 694.00 Tm (Long-Context Benchmark Report) Tj ET
+BT /F1 13 Tf 0.890 0.920 0.980 rg 1 0 0 1 54.00 650.00 Tm (Benchmark evidence for >300k-token conversations comparing short-context) Tj ET
+BT /F1 13 Tf 0.890 0.920 0.980 rg 1 0 0 1 54.00 634.00 Tm (prompting, full transcript stuffing, and agentic-memory retrieval.) Tj ET
+q 1.000 1.000 1.000 rg 54.00 530.00 140.00 92.00 re f Q
+BT /F2 13 Tf 0.160 0.190 0.260 rg 1 0 0 1 68.00 592.00 Tm (Pass Rate) Tj ET
+BT /F2 22 Tf 0.020 0.470 0.800 rg 1 0 0 1 68.00 560.00 Tm (57.0%) Tj ET
+BT /F1 11 Tf 0.360 0.400 0.490 rg 1 0 0 1 68.00 540.00 Tm (memory_enabled) Tj ET
+q 1.000 1.000 1.000 rg 214.00 530.00 140.00 92.00 re f Q
+BT /F2 13 Tf 0.160 0.190 0.260 rg 1 0 0 1 228.00 592.00 Tm (Prompt Tokens) Tj ET
+BT /F2 22 Tf 0.020 0.470 0.800 rg 1 0 0 1 228.00 560.00 Tm (349.4) Tj ET
+BT /F1 11 Tf 0.360 0.400 0.490 rg 1 0 0 1 228.00 540.00 Tm (avg per answer) Tj ET
+q 1.000 1.000 1.000 rg 374.00 530.00 140.00 92.00 re f Q
+BT /F2 13 Tf 0.160 0.190 0.260 rg 1 0 0 1 388.00 592.00 Tm (Cost vs Full) Tj ET
+BT /F2 22 Tf 0.020 0.470 0.800 rg 1 0 0 1 388.00 560.00 Tm (242.5x cheaper) Tj ET
+BT /F1 11 Tf 0.360 0.400 0.490 rg 1 0 0 1 388.00 540.00 Tm (memory_enabled) Tj ET
+BT /F2 15 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 486.00 Tm (Headline) Tj ET
+BT /F1 14 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 462.00 Tm (On >300k-token conversations, agentic-memory retrieval outperformed) Tj ET
+BT /F1 14 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 444.00 Tm (both short-context and full-context baselines while using) Tj ET
+BT /F1 14 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 426.00 Tm (dramatically fewer prompt tokens than transcript stuffing.) Tj ET
+BT /F2 15 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 392.00 Tm (Key Findings) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 366.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 366.00 Tm (memory_enabled achieved a 171/300 pass rate \(57.0%\), versus 72/300 \(24.0%\)) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 351.00 Tm (for full_context and 4/300 \(1.3%\) for short_context.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 328.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 328.00 Tm (memory_enabled used 349.4 prompt tokens on average, compared with 160543.9) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 313.00 Tm (for full_context.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 290.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 290.00 Tm (memory_enabled was 58.4% faster on average than full_context.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 267.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 267.00 Tm (full_context cost about 242.5x more per example than memory_enabled.) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+5 0 obj
+<< /Length 4950 >>
+stream
+q 1.000 1.000 1.000 rg 0.00 0.00 612.00 792.00 re f Q
+BT /F2 24 Tf 0.080 0.130 0.240 rg 1 0 0 1 54.00 740.00 Tm (Mode Comparison) Tj ET
+BT /F1 12 Tf 0.350 0.390 0.470 rg 1 0 0 1 54.00 716.00 Tm (Measured on 12 beyond-250k conversations with Gemini 2.5 Flash.) Tj ET
+q 0.080 0.130 0.240 rg 54.00 668.00 504.00 28.00 re f Q
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 60.00 678.00 Tm (Mode) Tj ET
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 174.00 678.00 Tm (Pass) Tj ET
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 250.00 678.00 Tm (Judge) Tj ET
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 322.00 678.00 Tm (Latency) Tj ET
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 408.00 678.00 Tm (Prompt Tokens) Tj ET
+BT /F2 11 Tf 1.000 1.000 1.000 rg 1 0 0 1 516.00 678.00 Tm (Cost) Tj ET
+q 0.940 0.970 1.000 rg 54.00 632.00 504.00 34.00 re f Q
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 60.00 644.00 Tm (memory_enabled) Tj ET
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 174.00 644.00 Tm (171/300 \(57.0%\)) Tj ET
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 250.00 644.00 Tm (0.73) Tj ET
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 322.00 644.00 Tm (1045 ms) Tj ET
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 408.00 644.00 Tm (349.4) Tj ET
+BT /F2 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 516.00 644.00 Tm ($0.000066) Tj ET
+q 1.000 1.000 1.000 rg 54.00 594.00 504.00 34.00 re f Q
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 60.00 606.00 Tm (full_context) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 174.00 606.00 Tm (72/300 \(24.0%\)) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 250.00 606.00 Tm (0.32) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 322.00 606.00 Tm (2512 ms) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 408.00 606.00 Tm (160543.9) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 516.00 606.00 Tm ($0.016114) Tj ET
+q 0.980 0.980 0.990 rg 54.00 556.00 504.00 34.00 re f Q
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 60.00 568.00 Tm (short_context) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 174.00 568.00 Tm (4/300 \(1.3%\)) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 250.00 568.00 Tm (0.11) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 322.00 568.00 Tm (980 ms) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 408.00 568.00 Tm (1718.4) Tj ET
+BT /F1 10 Tf 0.160 0.190 0.260 rg 1 0 0 1 516.00 568.00 Tm ($0.000196) Tj ET
+BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 560.00 Tm (Business Impact) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 536.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 536.00 Tm (Accuracy lift over full_context: 33.0 percentage points.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 515.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 515.00 Tm (Latency reduction versus full_context: 58.4%.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 494.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 494.00 Tm (Prompt-token reduction versus full_context: 99.8%.) Tj ET
+BT /F2 13 Tf 0.020 0.470 0.800 rg 1 0 0 1 60.00 473.00 Tm (?) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 76.00 473.00 Tm (Estimated cost reduction versus full_context: 99.6%.) Tj ET
+BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 430.00 Tm (Interpretation) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 406.00 Tm (On transcripts that grow beyond a practical prompt budget, brute-force context) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 390.00 Tm (stuffing becomes expensive and still leaves quality on the table. Retrieval) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 374.00 Tm (through agentic-memory preserves the relevant profile facts, prior events, and) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 358.00 Tm (successful procedures while keeping prompts compact enough to stay economical.) Tj ET
+BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 310.00 Tm (Recommended Next Step) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 286.00 Tm (Tune the memory-mode answer scaffold so Gemini is required to explicitly cover) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 270.00 Tm (every gold constraint that appears in retrieved memory. That should push the) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 254.00 Tm (pass rate higher without giving up the cost and latency advantage.) Tj ET
+BT /F2 16 Tf 0.160 0.190 0.260 rg 1 0 0 1 54.00 214.00 Tm (Sample Size Note) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 190.00 Tm (This 12-example run is a pilot. For a public-facing directional benchmark, the) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 174.00 Tm (next target should be at least 100 total examples, ideally with 20 or more per) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 158.00 Tm (scenario family. For tighter 95% pass-rate intervals near plus or minus 5) Tj ET
+BT /F1 12 Tf 0.000 0.000 0.000 rg 1 0 0 1 54.00 142.00 Tm (percentage points, target roughly 385 to 400 total examples.) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Type /Pages /Count 2 /Kids [4 0 R 6 0 R] >>
+endobj
+8 0 obj
+<< /Type /Catalog /Pages 7 0 R >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000003212 00000 n 
+0000003348 00000 n 
+0000008350 00000 n 
+0000008486 00000 n 
+0000008549 00000 n 
+trailer
+<< /Size 9 /Root 8 0 R >>
+startxref
+8598
+%%EOF

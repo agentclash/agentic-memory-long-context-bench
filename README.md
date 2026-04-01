@@ -25,32 +25,31 @@ The repo now also includes a first harness implementation for those three modes.
 
 ## Live Benchmark Artifacts
 
-The first full benchmark run against the `>300k` token dataset is now checked into the repo.
+The current primary benchmark artifact is the completed `n=300` run against the `>300k` token dataset.
 
 Core assets:
 
-- Dataset: [`datasets/long_context_v2_300k.jsonl`](datasets/long_context_v2_300k.jsonl)
-- Raw results: [`results/beyond_300k_full_run/results.jsonl`](results/beyond_300k_full_run/results.jsonl)
-- Resume checkpoint: [`results/beyond_300k_full_run/checkpoint.jsonl`](results/beyond_300k_full_run/checkpoint.jsonl)
-- Markdown report: [`reports/beyond_300k_full_run/benchmark_report.md`](reports/beyond_300k_full_run/benchmark_report.md)
-- PDF report: [`reports/beyond_300k_full_run/benchmark_report.pdf`](reports/beyond_300k_full_run/benchmark_report.pdf)
-- Summary JSON: [`reports/beyond_300k_full_run/benchmark_summary.json`](reports/beyond_300k_full_run/benchmark_summary.json)
-- Example breakdown CSV: [`reports/beyond_300k_full_run/example_breakdown.csv`](reports/beyond_300k_full_run/example_breakdown.csv)
+- Dataset: [`datasets/long_context_v3_300_examples_300k.jsonl`](datasets/long_context_v3_300_examples_300k.jsonl)
+- Raw results: [`results/gemini_flashlite_flashjudge_n300/results.jsonl`](results/gemini_flashlite_flashjudge_n300/results.jsonl)
+- Resume checkpoint: [`results/gemini_flashlite_flashjudge_n300/checkpoint.jsonl`](results/gemini_flashlite_flashjudge_n300/checkpoint.jsonl)
+- Markdown report: [`reports/gemini_flashlite_flashjudge_n300/benchmark_report.md`](reports/gemini_flashlite_flashjudge_n300/benchmark_report.md)
+- PDF report: [`reports/gemini_flashlite_flashjudge_n300/benchmark_report.pdf`](reports/gemini_flashlite_flashjudge_n300/benchmark_report.pdf)
+- Summary JSON: [`reports/gemini_flashlite_flashjudge_n300/benchmark_summary.json`](reports/gemini_flashlite_flashjudge_n300/benchmark_summary.json)
+- Example breakdown CSV: [`reports/gemini_flashlite_flashjudge_n300/example_breakdown.csv`](reports/gemini_flashlite_flashjudge_n300/example_breakdown.csv)
 
-Headline results from that run:
+Headline results from the completed `n=300` run:
 
-- `memory_enabled`: `7/12` passed (`58.3%`)
-- `full_context`: `3/12` passed (`25.0%`)
-- `short_context`: `0/12` passed (`0.0%`)
-- `memory_enabled` used `289.2` average prompt tokens vs `162590.2` for `full_context`
-- `memory_enabled` cost about `152.2x` less per example than `full_context`
+- `memory_enabled`: `171/300` passed (`57.0%`)
+- `full_context`: `72/300` passed (`24.0%`)
+- `short_context`: `4/300` passed (`1.3%`)
+- `memory_enabled` used `349.4` average prompt tokens vs `160543.9` for `full_context`
+- `memory_enabled` cost about `244x` less per row than `full_context`
+- `memory_enabled` judged-subset score: `0.7338` vs `0.3234` for `full_context`
 
-Important caveat:
+Historical note:
 
-- the current `12`-example run is a pilot, not the final public benchmark
-- the report now includes confidence intervals and should be interpreted as directional evidence
-- the next benchmark target should be at least `100` examples total, with `20+` examples per scenario family
-- for tighter 95% pass-rate intervals around `+/-5` percentage points, target roughly `385-400` examples total
+- the earlier `12`-example run in `results/beyond_300k_full_run/` remains in the repo as a pilot artifact
+- the `n=300` run above is now the main benchmark result to reference
 
 ## Dataset Design
 
