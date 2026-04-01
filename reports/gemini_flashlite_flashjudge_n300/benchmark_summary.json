@@ -101,6 +101,93 @@
     "recommended_rationale": "Around 100 binary-scored examples gives a very rough 95% margin of error of about +/-10 percentage points at worst-case accuracy. Around 385 examples brings that down to about +/-5 percentage points.",
     "recommended_strong_examples_total": 385
   },
+  "scenario_breakdown": {
+    "contradiction_resolution": {
+      "full_context": {
+        "pass_rate": 0.25,
+        "passed": 15,
+        "total": 60
+      },
+      "memory_enabled": {
+        "pass_rate": 1.0,
+        "passed": 60,
+        "total": 60
+      },
+      "short_context": {
+        "pass_rate": 0.06666666666666667,
+        "passed": 4,
+        "total": 60
+      }
+    },
+    "mixed_long_context": {
+      "full_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      },
+      "memory_enabled": {
+        "pass_rate": 0.016666666666666666,
+        "passed": 1,
+        "total": 60
+      },
+      "short_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      }
+    },
+    "procedure_reuse": {
+      "full_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      },
+      "memory_enabled": {
+        "pass_rate": 0.3,
+        "passed": 18,
+        "total": 60
+      },
+      "short_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      }
+    },
+    "profile_recall": {
+      "full_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      },
+      "memory_enabled": {
+        "pass_rate": 0.7,
+        "passed": 42,
+        "total": 60
+      },
+      "short_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      }
+    },
+    "troubleshooting_continuity": {
+      "full_context": {
+        "pass_rate": 0.95,
+        "passed": 57,
+        "total": 60
+      },
+      "memory_enabled": {
+        "pass_rate": 0.8333333333333334,
+        "passed": 50,
+        "total": 60
+      },
+      "short_context": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "total": 60
+      }
+    }
+  },
   "title": "agentic-memory n=300 Long-Context Benchmark Report",
   "total_runs": 900
 }

@@ -46,6 +46,19 @@ Headline results from the completed `n=300` run:
 - `memory_enabled` cost about `244x` less per row than `full_context`
 - `memory_enabled` judged-subset score: `0.7338` vs `0.3234` for `full_context`
 
+Claim boundaries:
+
+- what we can confidently say vs what we should not say is documented in [`docs/CLAIM_BOUNDARIES.md`](docs/CLAIM_BOUNDARIES.md)
+- the strongest benchmark claims today are:
+  - memory retrieval beats transcript stuffing on recall-heavy long-context tasks
+  - contradiction resolution is the strongest feature in the current run
+  - the prompt-token and cost reduction versus transcript stuffing is unambiguous
+- we should not currently claim:
+  - reduced hallucination as a broad general statement
+  - superiority on every task type
+  - production generalization without blind ingestion
+  - superiority versus competitor memory products
+
 Historical note:
 
 - the earlier `12`-example run in `results/beyond_300k_full_run/` remains in the repo as a pilot artifact

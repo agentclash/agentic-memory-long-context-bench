@@ -137,6 +137,24 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
         if row["mode"] == "memory_enabled" and row["rule_score"]["passed"]
     ][:3]
 
+    scenario_breakdown: dict[str, dict[str, dict[str, float | int]]] = {}
+    scenario_names = sorted({"_".join(row["example_id"].split("_")[:-2]) for row in rows})
+    for scenario in scenario_names:
+        scenario_breakdown[scenario] = {}
+        for mode in ("memory_enabled", "full_context", "short_context"):
+            bucket = [
+                row
+                for row in rows
+                if row["mode"] == mode and "_".join(row["example_id"].split("_")[:-2]) == scenario
+            ]
+            total = len(bucket)
+            passed = sum(1 for row in bucket if row["rule_score"]["passed"])
+            scenario_breakdown[scenario][mode] = {
+                "total": total,
+                "passed": passed,
+                "pass_rate": (passed / total) if total else 0.0,
+            }
+
     return {
         "title": title,
         "results_path": str(results_path),
@@ -149,6 +167,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
         "max_estimated_transcript_tokens": max_tokens,
         "mode_summaries": {mode: summary.to_dict() for mode, summary in summaries.items()},
         "relative_metrics": relative,
+        "scenario_breakdown": scenario_breakdown,
         "sample_size_guidance": {
             "current_run_is_pilot": dataset_examples < 100,
             "recommended_min_examples_total": 100,
@@ -182,6 +201,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
 def render_markdown(summary_payload: dict) -> str:
     mode_summaries = summary_payload["mode_summaries"]
     relative = summary_payload["relative_metrics"]
+    scenarios = summary_payload["scenario_breakdown"]
     lines = [
         f"# {summary_payload['title']}",
         "",
@@ -225,6 +245,48 @@ def render_markdown(summary_payload: dict) -> str:
 
     lines.extend(
         [
+            "",
+            "## Good Enough?",
+            "",
+            "Yes, with boundaries. The completed run is strong enough to support a narrow claim that retrieval-based memory beats transcript stuffing on this synthetic long-context benchmark. It is not yet strong enough to support the broadest production or competitor-comparison claims.",
+            "",
+            "## What You Can Confidently Claim",
+            "",
+            f"1. Memory retrieval beats transcript stuffing on recall-heavy long-context tasks. Overall, `memory_enabled` reached `{mode_summaries['memory_enabled']['pass_rate'] * 100:.1f}%` versus `{mode_summaries['full_context']['pass_rate'] * 100:.1f}%` for `full_context`, a gap of `{relative['pass_rate_lift_vs_full_context_pct_points']:.1f}` percentage points.",
+            f"2. Contradiction resolution is the single strongest result in the benchmark. `memory_enabled` solved `{int(scenarios['contradiction_resolution']['memory_enabled']['passed'])}/{int(scenarios['contradiction_resolution']['memory_enabled']['total'])}` (`{scenarios['contradiction_resolution']['memory_enabled']['pass_rate'] * 100:.1f}%`) while `full_context` solved `{int(scenarios['contradiction_resolution']['full_context']['passed'])}/{int(scenarios['contradiction_resolution']['full_context']['total'])}` (`{scenarios['contradiction_resolution']['full_context']['pass_rate'] * 100:.1f}%`).",
+            f"3. The economics are unambiguous. `memory_enabled` used `{mode_summaries['memory_enabled']['avg_prompt_tokens']:.1f}` prompt tokens versus `{mode_summaries['full_context']['avg_prompt_tokens']:.1f}` for `full_context`, and cost about `{relative['cost_multiple_full_context_vs_memory']:.1f}x` less per row.",
+            f"4. Profile recall works. `memory_enabled` solved `{int(scenarios['profile_recall']['memory_enabled']['passed'])}/{int(scenarios['profile_recall']['memory_enabled']['total'])}` (`{scenarios['profile_recall']['memory_enabled']['pass_rate'] * 100:.1f}%`) while `full_context` solved `{int(scenarios['profile_recall']['full_context']['passed'])}/{int(scenarios['profile_recall']['full_context']['total'])}` (`{scenarios['profile_recall']['full_context']['pass_rate'] * 100:.1f}%`).",
+            f"5. Short context is effectively useless for these tasks. It finished at `{mode_summaries['short_context']['pass_rate'] * 100:.1f}%` overall.",
+            "6. The benchmark infrastructure itself works: deterministic dataset generation, resumable execution, and 900 completed rows.",
+            "",
+            "## What You Cannot Claim",
+            "",
+            "1. Do not claim that memory reduces hallucination in a broad sense. The current failure label is really stale/forbidden-fact citation under strict must-not-include rules, not a clean fabrication metric.",
+            f"2. Do not claim memory beats full context across all task types. In troubleshooting continuity, `full_context` scored `{scenarios['troubleshooting_continuity']['full_context']['pass_rate'] * 100:.1f}%` versus `{scenarios['troubleshooting_continuity']['memory_enabled']['pass_rate'] * 100:.1f}%` for `memory_enabled`.",
+            f"3. Do not claim procedural memory is already a strong differentiator. On procedure reuse, `memory_enabled` scored only `{scenarios['procedure_reuse']['memory_enabled']['pass_rate'] * 100:.1f}%`.",
+            "4. Do not claim this generalizes to production as-is. The memory path still benefits from benchmark turn-kind labels at ingestion time.",
+            "5. Do not claim this works across model families in general. The completed run used a single participant model family.",
+            "",
+            "## What Is Genuinely Unanswered",
+            "",
+            "1. How much perfect ingestion labeling inflates the result remains the biggest open question.",
+            f"2. Why mixed long-context collapses so badly is unresolved: `memory_enabled` scored `{scenarios['mixed_long_context']['memory_enabled']['pass_rate'] * 100:.1f}%` there.",
+            "3. Whether the semantic / episodic / procedural taxonomy itself matters is still unknown without ablations.",
+            "4. This benchmark does not yet compare against actual memory products such as Mem0, Supermemory, or Zep.",
+            "5. The vocabulary and distractors likely need expansion before making the broadest generalization claims.",
+            "",
+            "## Claim Status",
+            "",
+            "| Claim | Status |",
+            "| --- | --- |",
+            "| Memory retrieval beats stuffing on recall tasks | Say it |",
+            "| Contradiction resolution is a killer feature | Say it loudly |",
+            "| 244x cost reduction | Say it |",
+            "| Reduces hallucination | Don't say it |",
+            "| Works for all task types | Don't say it |",
+            "| Procedural memory is strong | Don't say it yet |",
+            "| Better than Mem0 | Can't say it |",
+            "| Works in production without labels | Can't say it |",
             "",
             "## Why This Matters",
             "",
