@@ -24,3 +24,10 @@ def test_generator_produces_stable_shape(tmp_path: Path):
     assert "gold" in first
     assert first["gold"]["must_include"]
     assert first["task"]["requires"]
+
+
+def test_generator_can_target_minimum_token_budget():
+    rows = generate_dataset(examples=1, seed=7, min_tokens=1500, context_tier="test_long")
+    row = rows[0].to_dict()
+    assert row["metadata"]["estimated_transcript_tokens"] >= 1500
+    assert row["metadata"]["context_tier"] == "test_long"

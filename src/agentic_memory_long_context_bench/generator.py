@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
+import re
 from pathlib import Path
 
 from .schema import BenchmarkExample, Gold, Task, Turn
@@ -28,9 +30,17 @@ SCENARIO_TYPES = [
 ]
 
 DIFFICULTY_BY_INDEX = ["easy", "medium", "hard"]
+DEFAULT_MIN_TOKENS = 0
+DEFAULT_CONTEXT_TIER = "standard"
 
 
-def generate_dataset(*, examples: int, seed: int) -> list[BenchmarkExample]:
+def generate_dataset(
+    *,
+    examples: int,
+    seed: int,
+    min_tokens: int = DEFAULT_MIN_TOKENS,
+    context_tier: str = DEFAULT_CONTEXT_TIER,
+) -> list[BenchmarkExample]:
     rng = random.Random(seed)
     rows: list[BenchmarkExample] = []
     for index in range(examples):
@@ -38,7 +48,17 @@ def generate_dataset(*, examples: int, seed: int) -> list[BenchmarkExample]:
         difficulty = DIFFICULTY_BY_INDEX[index % len(DIFFICULTY_BY_INDEX)]
         example_seed = seed + index
         row_rng = random.Random(example_seed)
-        rows.append(_make_example(index=index, seed=example_seed, scenario_type=scenario_type, difficulty=difficulty, rng=row_rng))
+        rows.append(
+            _make_example(
+                index=index,
+                seed=example_seed,
+                scenario_type=scenario_type,
+                difficulty=difficulty,
+                rng=row_rng,
+                min_tokens=min_tokens,
+                context_tier=context_tier,
+            )
+        )
     return rows
 
 
@@ -49,6 +69,8 @@ def _make_example(
     scenario_type: str,
     difficulty: str,
     rng: random.Random,
+    min_tokens: int,
+    context_tier: str,
 ) -> BenchmarkExample:
     persona = {
         "name": rng.choice(FIRST_NAMES),
@@ -109,6 +131,27 @@ def _make_example(
     )
     support_ids.append(proc_id or "")
 
+    if min_tokens > 0:
+        block_index = 0
+        while _estimate_conversation_tokens(turns) < min_tokens:
+            add_turn(
+                "user",
+                "distractor_block",
+                _make_distractor_block(
+                    rng=rng,
+                    persona=persona,
+                    issue=issue,
+                    attempted=attempted,
+                    block_index=block_index,
+                ),
+            )
+            add_turn(
+                "assistant",
+                "distractor_block",
+                _make_ack_block(issue=issue, block_index=block_index),
+            )
+            block_index += 1
+
     task_prompt, must_include, must_not_include, required = _build_task(
         scenario_type=scenario_type,
         persona=persona,
@@ -117,6 +160,12 @@ def _make_example(
         procedure=procedure,
         stale_plan=stale_plan,
     )
+
+    estimated_transcript_tokens = _estimate_conversation_tokens(turns)
+    supporting_fact_tokens = _estimate_text_tokens(" ".join(
+        turn.text for turn in turns if turn.fact_id in {fact_id for fact_id in support_ids if fact_id}
+    ))
+    distractor_tokens = _estimate_text_tokens(" ".join(turn.text for turn in turns if "distractor" in turn.kind))
 
     return BenchmarkExample(
         id=f"{scenario_type}_{difficulty}_{index:04d}",
@@ -133,6 +182,11 @@ def _make_example(
         ),
         metadata={
             "target_length_turns": len(turns),
+            "estimated_transcript_tokens": estimated_transcript_tokens,
+            "supporting_fact_tokens": supporting_fact_tokens,
+            "distractor_tokens": distractor_tokens,
+            "context_tier": context_tier,
+            "target_min_tokens": min_tokens,
             "persona": persona,
             "issue": issue,
             "attempted_steps": attempted,
@@ -186,6 +240,43 @@ def _build_task(
     )
 
 
+def _estimate_text_tokens(text: str) -> int:
+    coarse = math.ceil(len(text) / 4)
+    lexical = len(re.findall(r"\w+|[^\w\s]", text))
+    return max(coarse, lexical)
+
+
+def _estimate_conversation_tokens(turns: list[Turn]) -> int:
+    return sum(_estimate_text_tokens(turn.text) + 8 for turn in turns)
+
+
+def _make_distractor_block(
+    *,
+    rng: random.Random,
+    persona: dict[str, str],
+    issue: str,
+    attempted: list[str],
+    block_index: int,
+) -> str:
+    fragments = [
+        f"Block {block_index}: this paragraph contains non-critical support chatter about dashboards, project status, planning notes, and release coordination.",
+        f"The user repeats incidental observations about the {persona['theme']} theme, their {persona['device']}, and unrelated planning for the {persona['channel']} channel.",
+        f"They also mention background notes about {issue}, but without adding new authoritative facts beyond what was already established earlier in the conversation.",
+        f"Previously attempted steps like {attempted[0]} and {attempted[1]} are mentioned indirectly among many irrelevant details, meeting notes, and duplicate summaries.",
+        "Additional filler includes repeated references to design reviews, internal docs, analytics discussions, migration notes, environment cleanups, and stakeholder updates.",
+    ]
+    sentence = " ".join(fragments)
+    return " ".join(sentence for _ in range(80))
+
+
+def _make_ack_block(*, issue: str, block_index: int) -> str:
+    sentence = (
+        f"Ack block {block_index}: the assistant acknowledges the background detail about {issue} "
+        "and repeats that it is collecting context, but it does not add any new ground-truth facts."
+    )
+    return " ".join(sentence for _ in range(40))
+
+
 def write_dataset(rows: list[BenchmarkExample], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as handle:
@@ -198,6 +289,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--examples", type=int, default=25, help="Number of examples to generate.")
     parser.add_argument("--seed", type=int, default=7, help="Base RNG seed.")
     parser.add_argument(
+        "--min-tokens",
+        type=int,
+        default=DEFAULT_MIN_TOKENS,
+        help="Minimum estimated transcript tokens per example.",
+    )
+    parser.add_argument(
+        "--context-tier",
+        type=str,
+        default=DEFAULT_CONTEXT_TIER,
+        help="Label stored in metadata to describe the context-budget tier.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("datasets/sample_v1.jsonl"),
@@ -208,7 +311,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    rows = generate_dataset(examples=args.examples, seed=args.seed)
+    rows = generate_dataset(
+        examples=args.examples,
+        seed=args.seed,
+        min_tokens=args.min_tokens,
+        context_tier=args.context_tier,
+    )
     write_dataset(rows, args.output)
     print(f"Wrote {len(rows)} examples to {args.output}")
 

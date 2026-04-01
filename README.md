@@ -12,6 +12,7 @@ This repo is designed to answer a specific question:
 - a JSONL dataset format for long multi-turn conversations
 - scenario types that stress profile recall, troubleshooting continuity, contradiction handling, and procedure reuse
 - a benchmark-ready schema that can be consumed by a separate evaluator
+- explicit token-budget tiers so examples can exceed practical or absolute context limits
 
 This repo is only about dataset generation and dataset definition.
 The evaluation runner can live here later, or in a separate repo that compares:
@@ -81,6 +82,14 @@ Top-level fields:
 - `gold`
 - `metadata`
 
+Important `metadata` fields include:
+
+- `estimated_transcript_tokens`
+- `supporting_fact_tokens`
+- `distractor_tokens`
+- `context_tier`
+- `target_min_tokens`
+
 `conversation` is a list of turns:
 
 ```json
@@ -134,6 +143,17 @@ Generate a larger dataset:
 generate-long-context-dataset --examples 250 --seed 7 --output datasets/long_context_v1.jsonl
 ```
 
+Generate a dataset that explicitly targets transcripts beyond a 250k-token budget:
+
+```bash
+generate-long-context-dataset \
+  --examples 12 \
+  --seed 7 \
+  --min-tokens 300000 \
+  --context-tier beyond_250k \
+  --output datasets/long_context_v2_300k.jsonl
+```
+
 ## Generation Strategy
 
 The generator does not ask an LLM to write the dataset.
@@ -144,6 +164,7 @@ Instead it uses seeded templates and deterministic slot-filling:
 - sample entities and facts from controlled vocabularies
 - place important facts early or mid-conversation
 - inject distractor turns later
+- optionally expand the transcript with large distractor blocks until a target token budget is reached
 - optionally supersede one fact with a correction
 - insert prior procedure outcomes
 - create a final task whose gold answer depends on the planted evidence
