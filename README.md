@@ -23,6 +23,28 @@ The evaluation runner can live here later, or in a separate repo that compares:
 
 The repo now also includes a first harness implementation for those three modes.
 
+## Live Benchmark Artifacts
+
+The first full benchmark run against the `>300k` token dataset is now checked into the repo.
+
+Core assets:
+
+- Dataset: [`datasets/long_context_v2_300k.jsonl`](datasets/long_context_v2_300k.jsonl)
+- Raw results: [`results/beyond_300k_full_run/results.jsonl`](results/beyond_300k_full_run/results.jsonl)
+- Resume checkpoint: [`results/beyond_300k_full_run/checkpoint.jsonl`](results/beyond_300k_full_run/checkpoint.jsonl)
+- Markdown report: [`reports/beyond_300k_full_run/benchmark_report.md`](reports/beyond_300k_full_run/benchmark_report.md)
+- PDF report: [`reports/beyond_300k_full_run/benchmark_report.pdf`](reports/beyond_300k_full_run/benchmark_report.pdf)
+- Summary JSON: [`reports/beyond_300k_full_run/benchmark_summary.json`](reports/beyond_300k_full_run/benchmark_summary.json)
+- Example breakdown CSV: [`reports/beyond_300k_full_run/example_breakdown.csv`](reports/beyond_300k_full_run/example_breakdown.csv)
+
+Headline results from that run:
+
+- `memory_enabled`: `7/12` passed (`58.3%`)
+- `full_context`: `3/12` passed (`25.0%`)
+- `short_context`: `0/12` passed (`0.0%`)
+- `memory_enabled` used `289.2` average prompt tokens vs `162590.2` for `full_context`
+- `memory_enabled` cost about `152.2x` less per example than `full_context`
+
 ## Dataset Design
 
 Each example is a long conversation with:
