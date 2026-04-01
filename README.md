@@ -162,9 +162,12 @@ Run the harness against a dataset:
 export GEMINI_API_KEY=your_key_here
 run-long-context-harness \
   --dataset datasets/long_context_v2_300k.jsonl \
-  --output results/benchmark_v1.jsonl \
+  --output results \
+  --run-name benchmark_v1 \
   --model gemini-2.5-flash \
   --judge-model gemini-2.5-flash-lite \
+  --sleep-between-requests 1.5 \
+  --resume \
   --limit 3 \
   --report
 ```
@@ -182,6 +185,17 @@ The `memory_enabled` mode explicitly uses:
 - procedural memory for prior successful procedures
 
 and records the retrieved memory traces in the output JSONL.
+
+Each run gets its own folder, for example:
+
+```text
+results/
+└── benchmark_v1/
+    ├── checkpoint.jsonl
+    └── results.jsonl
+```
+
+That makes the output live somewhere clean and resumable.
 
 ## Generation Strategy
 
@@ -209,3 +223,9 @@ The current harness writes per-example results with:
 - prompt/completion tokens
 - estimated cost
 - memory traces for semantic, episodic, and procedural retrieval
+
+Operational safeguards:
+
+- retries with exponential backoff on transient failures and rate limits
+- optional sleep between requests
+- checkpointing so interrupted runs can resume

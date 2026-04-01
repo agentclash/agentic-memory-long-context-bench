@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +47,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=0, help="Optional cap on examples to run.")
     parser.add_argument("--short-context-tokens", type=int, default=8000)
     parser.add_argument("--full-context-budget", type=int, default=250000)
+    parser.add_argument("--sleep-between-requests", type=float, default=0.0)
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--run-name", type=str, default="")
+    parser.add_argument("--max-retries", type=int, default=5)
+    parser.add_argument("--initial-backoff-seconds", type=float, default=2.0)
+    parser.add_argument("--backoff-multiplier", type=float, default=2.0)
+    parser.add_argument("--max-backoff-seconds", type=float, default=30.0)
     parser.add_argument("--skip-judge", action="store_true")
     parser.add_argument("--report", action="store_true")
     return parser.parse_args()
@@ -62,6 +70,13 @@ def main() -> None:
         limit=args.limit,
         short_context_tokens=args.short_context_tokens,
         full_context_budget=args.full_context_budget,
+        sleep_between_requests=args.sleep_between_requests,
+        resume=args.resume,
+        run_name=args.run_name,
+        max_retries=args.max_retries,
+        initial_backoff_seconds=args.initial_backoff_seconds,
+        backoff_multiplier=args.backoff_multiplier,
+        max_backoff_seconds=args.max_backoff_seconds,
         use_judge=not args.skip_judge,
         print_report=args.report,
     )
@@ -77,6 +92,13 @@ def run_harness(
     limit: int,
     short_context_tokens: int,
     full_context_budget: int,
+    sleep_between_requests: float,
+    resume: bool,
+    run_name: str,
+    max_retries: int,
+    initial_backoff_seconds: float,
+    backoff_multiplier: float,
+    max_backoff_seconds: float,
     use_judge: bool,
     print_report: bool,
 ) -> list[HarnessResult]:
@@ -84,14 +106,43 @@ def run_harness(
     if limit > 0:
         examples = examples[:limit]
 
-    model = GeminiModel(model=model_name)
-    judge = GeminiJudge(model=judge_model_name) if use_judge else None
+    model = GeminiModel(
+        model=model_name,
+        max_retries=max_retries,
+        initial_backoff_seconds=initial_backoff_seconds,
+        backoff_multiplier=backoff_multiplier,
+        max_backoff_seconds=max_backoff_seconds,
+    )
+    judge = (
+        GeminiJudge(
+            model=judge_model_name,
+            max_retries=max_retries,
+            initial_backoff_seconds=initial_backoff_seconds,
+            backoff_multiplier=backoff_multiplier,
+            max_backoff_seconds=max_backoff_seconds,
+        )
+        if use_judge
+        else None
+    )
     results: list[HarnessResult] = []
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
+    run_dir, resolved_output_path, checkpoint_path = _prepare_run_paths(
+        output_path=output_path,
+        run_name=run_name,
+    )
+    completed_keys = _load_completed_keys(checkpoint_path) if resume else set()
+
+    mode_count = len(modes)
+    total_units = len(examples) * mode_count
+
+    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    file_mode = "a" if resume and resolved_output_path.exists() else "w"
+    with resolved_output_path.open(file_mode, encoding="utf-8") as handle:
         for example in examples:
             for mode in modes:
+                result_key = f"{example.id}::{mode}"
+                if result_key in completed_keys:
+                    continue
                 prompt, prompt_metadata, memory_trace = _build_mode_prompt(
                     example=example,
                     mode=mode,
@@ -134,11 +185,17 @@ def run_harness(
                     prompt_metadata=prompt_metadata,
                 )
                 handle.write(json.dumps(result.to_dict(), sort_keys=True) + "\n")
+                handle.flush()
                 results.append(result)
+                _append_checkpoint(checkpoint_path, result_key)
+                completed_keys.add(result_key)
+                if sleep_between_requests > 0:
+                    time.sleep(sleep_between_requests)
 
     if print_report:
-        print(render_report(results))
-    return results
+        all_results = _load_results(resolved_output_path)
+        print(render_report(all_results))
+    return _load_results(resolved_output_path)
 
 
 def render_report(results: list[HarnessResult]) -> str:
@@ -170,6 +227,47 @@ def render_report(results: list[HarnessResult]) -> str:
             ]
         )
     return "\n".join(lines)
+
+
+def _prepare_run_paths(*, output_path: Path, run_name: str) -> tuple[Path, Path, Path]:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    resolved_run_name = run_name or f"run_{timestamp}"
+    if output_path.suffix == ".jsonl":
+        run_dir = output_path.parent / resolved_run_name
+        results_path = run_dir / "results.jsonl"
+    else:
+        run_dir = output_path / resolved_run_name
+        results_path = run_dir / "results.jsonl"
+    checkpoint_path = run_dir / "checkpoint.jsonl"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir, results_path, checkpoint_path
+
+
+def _append_checkpoint(path: Path, result_key: str) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"result_key": result_key}) + "\n")
+
+
+def _load_completed_keys(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    keys: set[str] = set()
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            payload = json.loads(line)
+            keys.add(payload["result_key"])
+    return keys
+
+
+def _load_results(path: Path) -> list[HarnessResult]:
+    rows: list[HarnessResult] = []
+    if not path.exists():
+        return rows
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            payload = json.loads(line)
+            rows.append(HarnessResult(**payload))
+    return rows
 
 
 def _build_mode_prompt(

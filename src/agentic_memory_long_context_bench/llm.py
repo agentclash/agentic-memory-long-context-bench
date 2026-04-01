@@ -27,10 +27,22 @@ class ModelResponse:
 
 
 class GeminiModel:
-    def __init__(self, *, model: str):
+    def __init__(
+        self,
+        *,
+        model: str,
+        max_retries: int = 5,
+        initial_backoff_seconds: float = 2.0,
+        backoff_multiplier: float = 2.0,
+        max_backoff_seconds: float = 30.0,
+    ):
         from google import genai
 
         self.model = model
+        self.max_retries = max_retries
+        self.initial_backoff_seconds = initial_backoff_seconds
+        self.backoff_multiplier = backoff_multiplier
+        self.max_backoff_seconds = max_backoff_seconds
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError(
@@ -40,12 +52,23 @@ class GeminiModel:
         self._client = genai.Client(api_key=api_key)
 
     def generate(self, *, prompt: str) -> ModelResponse:
-        started = time.perf_counter()
-        response = self._client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        latency_ms = (time.perf_counter() - started) * 1000
+        attempt = 0
+        delay = self.initial_backoff_seconds
+        while True:
+            attempt += 1
+            started = time.perf_counter()
+            try:
+                response = self._client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                )
+                latency_ms = (time.perf_counter() - started) * 1000
+                break
+            except Exception as exc:
+                if attempt > self.max_retries or not _is_retryable_exception(exc):
+                    raise
+                time.sleep(delay)
+                delay = min(delay * self.backoff_multiplier, self.max_backoff_seconds)
 
         usage = getattr(response, "usage_metadata", None)
         input_tokens = getattr(usage, "prompt_token_count", None) or _estimate_text_tokens(prompt)
@@ -61,8 +84,8 @@ class GeminiModel:
 
 
 class GeminiJudge:
-    def __init__(self, *, model: str):
-        self._model = GeminiModel(model=model)
+    def __init__(self, *, model: str, **kwargs: Any):
+        self._model = GeminiModel(model=model, **kwargs)
 
     def judge(self, *, prompt: str) -> dict[str, Any]:
         response = self._model.generate(prompt=prompt)
@@ -92,3 +115,22 @@ def _extract_json_object(text: str) -> dict[str, Any]:
             "hallucination": True,
             "reasoning": "Judge JSON parse failed.",
         }
+
+
+def _is_retryable_exception(exc: Exception) -> bool:
+    text = str(exc).lower()
+    retry_markers = [
+        "429",
+        "resource_exhausted",
+        "rate limit",
+        "quota",
+        "deadline exceeded",
+        "timed out",
+        "timeout",
+        "temporar",
+        "unavailable",
+        "internal",
+        "503",
+        "500",
+    ]
+    return any(marker in text for marker in retry_markers)
