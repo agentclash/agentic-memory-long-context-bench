@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -54,6 +55,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-backoff-seconds", type=float, default=2.0)
     parser.add_argument("--backoff-multiplier", type=float, default=2.0)
     parser.add_argument("--max-backoff-seconds", type=float, default=30.0)
+    parser.add_argument("--judge-sample-ratio", type=float, default=1.0)
+    parser.add_argument("--judge-sample-size", type=int, default=0)
+    parser.add_argument("--judge-random-seed", type=int, default=7)
     parser.add_argument("--skip-judge", action="store_true")
     parser.add_argument("--report", action="store_true")
     return parser.parse_args()
@@ -77,6 +81,9 @@ def main() -> None:
         initial_backoff_seconds=args.initial_backoff_seconds,
         backoff_multiplier=args.backoff_multiplier,
         max_backoff_seconds=args.max_backoff_seconds,
+        judge_sample_ratio=args.judge_sample_ratio,
+        judge_sample_size=args.judge_sample_size,
+        judge_random_seed=args.judge_random_seed,
         use_judge=not args.skip_judge,
         print_report=args.report,
     )
@@ -99,6 +106,9 @@ def run_harness(
     initial_backoff_seconds: float,
     backoff_multiplier: float,
     max_backoff_seconds: float,
+    judge_sample_ratio: float,
+    judge_sample_size: int,
+    judge_random_seed: int,
     use_judge: bool,
     print_report: bool,
 ) -> list[HarnessResult]:
@@ -125,6 +135,14 @@ def run_harness(
         else None
     )
     results: list[HarnessResult] = []
+    judged_keys = _select_judged_keys(
+        examples=examples,
+        modes=modes,
+        sample_ratio=judge_sample_ratio,
+        sample_size=judge_sample_size,
+        seed=judge_random_seed,
+        enabled=use_judge,
+    )
 
     run_dir, resolved_output_path, checkpoint_path = _prepare_run_paths(
         output_path=output_path,
@@ -153,7 +171,7 @@ def run_harness(
                 rule_score = score_response(example, response.text)
                 judge_score = (
                     _judge_example(example=example, answer=response.text, judge=judge)
-                    if judge is not None
+                    if judge is not None and result_key in judged_keys
                     else None
                 )
                 total_cost = estimate_cost_usd(
@@ -213,6 +231,7 @@ def render_report(results: list[HarnessResult]) -> str:
             for result in bucket
             if result.judge_score is not None and "overall_score" in result.judge_score
         ]
+        judged_count = len(judge_scores)
         avg_judge = sum(judge_scores) / len(judge_scores) if judge_scores else 0.0
         lines.extend(
             [
@@ -220,6 +239,7 @@ def render_report(results: list[HarnessResult]) -> str:
                 mode,
                 f"  rule_pass_rate: {passed}/{total} ({round((passed / total) * 100, 1) if total else 0.0}%)",
                 f"  hallucination_rate: {hallucinations}/{total} ({round((hallucinations / total) * 100, 1) if total else 0.0}%)",
+                f"  judged_rows: {judged_count}/{total} ({round((judged_count / total) * 100, 1) if total else 0.0}%)",
                 f"  avg_judge_score: {round(avg_judge, 4)}",
                 f"  avg_latency_ms: {round(avg_latency, 2)}",
                 f"  avg_prompt_tokens: {round(avg_prompt_tokens, 1)}",
@@ -348,6 +368,41 @@ def _judge_example(*, example: BenchmarkExample, answer: str, judge: GeminiJudge
         f"MODEL_ANSWER:\n{answer}\n"
     )
     return judge.judge(prompt=prompt)
+
+
+def _select_judged_keys(
+    *,
+    examples: list[BenchmarkExample],
+    modes: list[str],
+    sample_ratio: float,
+    sample_size: int,
+    seed: int,
+    enabled: bool,
+) -> set[str]:
+    if not enabled:
+        return set()
+    if sample_ratio <= 0 and sample_size <= 0:
+        return set()
+
+    rng = random.Random(seed)
+    example_ids = [example.id for example in examples]
+    selected: set[str] = set()
+
+    if sample_size > 0:
+        per_mode_base = sample_size // max(1, len(modes))
+        remainder = sample_size % max(1, len(modes))
+        for index, mode in enumerate(modes):
+            desired = min(len(example_ids), per_mode_base + (1 if index < remainder else 0))
+            for example_id in rng.sample(example_ids, desired):
+                selected.add(f"{example_id}::{mode}")
+        return selected
+
+    bounded_ratio = min(max(sample_ratio, 0.0), 1.0)
+    desired = min(len(example_ids), max(1, round(len(example_ids) * bounded_ratio)))
+    for mode in modes:
+        for example_id in rng.sample(example_ids, desired):
+            selected.add(f"{example_id}::{mode}")
+    return selected
 
 
 if __name__ == "__main__":

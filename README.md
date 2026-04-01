@@ -195,6 +195,7 @@ run-long-context-harness \
   --run-name benchmark_v1 \
   --model gemini-2.5-flash \
   --judge-model gemini-2.5-flash-lite \
+  --judge-sample-ratio 1.0 \
   --sleep-between-requests 1.5 \
   --resume \
   --limit 3 \
@@ -223,6 +224,41 @@ The transcript-based modes and memory-based mode now share the same answer scaff
 - return `RELEVANT_FACTS` followed by `ANSWER`
 
 That change makes the `full_context` baseline meaningfully fairer than raw transcript stuffing for the next benchmark rerun.
+
+Judge-sampling controls:
+
+- `--judge-sample-ratio 0.35`
+  Judge about 35% of rows in each mode.
+- `--judge-sample-size 120`
+  Judge a fixed number of rows total, distributed evenly across modes.
+- `--judge-random-seed 7`
+  Keep subset selection reproducible.
+
+Recommended low-cost paper workflow:
+
+- run rule-based scoring on all examples
+- run LLM judging on only `30-40%` of rows
+- report full-dataset rule metrics and subset-only judge metrics separately
+
+Example `n=300` command with subset judging:
+
+```bash
+run-long-context-harness \
+  --dataset datasets/long_context_v3_300_examples_300k.jsonl \
+  --output results \
+  --run-name gemini_flashlite_flashjudge_n300 \
+  --model gemini-2.5-flash-lite \
+  --judge-model gemini-3-flash-preview \
+  --judge-sample-ratio 0.35 \
+  --sleep-between-requests 1.5 \
+  --resume \
+  --report
+```
+
+Model-name note:
+
+- Google’s official Gemini model docs currently document `gemini-2.5-*` naming patterns and `*-latest` aliases.
+- If `gemini-3-flash-preview` is not available in your account, fall back to `gemini-2.5-flash` as the cheap judge.
 
 Each run gets its own folder, for example:
 
