@@ -339,3 +339,7 @@ def _judge_example(*, example: BenchmarkExample, answer: str, judge: GeminiJudge
         f"MODEL_ANSWER:\n{answer}\n"
     )
     return judge.judge(prompt=prompt)
+
+
+if __name__ == "__main__":
+    main()
