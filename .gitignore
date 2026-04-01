@@ -6,5 +6,6 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+results/
 datasets/*.jsonl
 !datasets/.gitkeep

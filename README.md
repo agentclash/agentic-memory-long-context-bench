@@ -21,6 +21,8 @@ The evaluation runner can live here later, or in a separate repo that compares:
 - full-context baseline
 - memory-enabled system
 
+The repo now also includes a first harness implementation for those three modes.
+
 ## Dataset Design
 
 Each example is a long conversation with:
@@ -154,6 +156,33 @@ generate-long-context-dataset \
   --output datasets/long_context_v2_300k.jsonl
 ```
 
+Run the harness against a dataset:
+
+```bash
+export GEMINI_API_KEY=your_key_here
+run-long-context-harness \
+  --dataset datasets/long_context_v2_300k.jsonl \
+  --output results/benchmark_v1.jsonl \
+  --model gemini-2.5-flash \
+  --judge-model gemini-2.5-flash-lite \
+  --limit 3 \
+  --report
+```
+
+Harness modes:
+
+- `short_context`
+- `full_context`
+- `memory_enabled`
+
+The `memory_enabled` mode explicitly uses:
+
+- semantic memory for durable facts and corrections
+- episodic memory for events and attempted steps
+- procedural memory for prior successful procedures
+
+and records the retrieved memory traces in the output JSONL.
+
 ## Generation Strategy
 
 The generator does not ask an LLM to write the dataset.
@@ -172,18 +201,11 @@ Instead it uses seeded templates and deterministic slot-filling:
 That gives us exact labels and stable regeneration.
 
 ## Next Step
+The current harness writes per-example results with:
 
-After dataset generation, the natural next repo layer is an evaluator that runs:
-
-- short-context baseline
-- full-context baseline
-- agentic-memory-enabled retrieval
-
-and reports:
-
-- quality
-- hallucination rate
+- rule-based pass/fail scoring
+- optional LLM-as-judge scoring
 - latency
-- prompt tokens
-- completion tokens
+- prompt/completion tokens
 - estimated cost
+- memory traces for semantic, episodic, and procedural retrieval

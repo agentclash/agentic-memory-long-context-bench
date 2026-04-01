@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Synthetic long-context benchmark dataset generator for memory systems."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "agentic-memory @ git+https://github.com/agentclash/agentic-memory.git",
+    "google-genai>=1.68.0,<2",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -17,6 +20,7 @@ dev = [
 
 [project.scripts]
 generate-long-context-dataset = "agentic_memory_long_context_bench.generator:main"
+run-long-context-harness = "agentic_memory_long_context_bench.runner:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
