@@ -224,6 +224,60 @@ The transcript-based modes and memory-based mode now share the same answer scaff
 
 That change makes the `full_context` baseline meaningfully fairer than raw transcript stuffing for the next benchmark rerun.
 
+## Claude Code Headless Backend
+
+The harness can also use Claude Code headless mode instead of a direct API backend.
+
+Why use it:
+
+- no separate API billing setup if your Claude Code team account already covers usage
+- works cleanly for local benchmark automation
+- lets you test Claude models before deciding whether to add API-based runs later
+
+Recommended model pairing:
+
+- generation model: `sonnet`
+- judge model: `opus`
+
+Typical command:
+
+```bash
+run-long-context-harness \
+  --backend claude_code \
+  --judge-backend claude_code \
+  --model sonnet \
+  --judge-model opus \
+  --dataset datasets/long_context_v2_300k.jsonl \
+  --output results \
+  --run-name claude_headless_smoke \
+  --sleep-between-requests 1.5 \
+  --resume \
+  --limit 3 \
+  --report
+```
+
+Optional Claude-specific flags:
+
+- `--claude-binary /path/to/claude`
+- `--claude-mcp-config /absolute/path/to/mcp.json`
+- `--claude-max-budget-usd 10`
+
+Setup checklist for Claude Code headless:
+
+1. Install Claude Code so the `claude` binary is on your `PATH`.
+2. Sign in with your Claude Code team account.
+3. Verify headless mode works:
+
+```bash
+claude -p "Reply with the word ready" --model sonnet --output-format json
+```
+
+Notes:
+
+- for benchmark fairness, the Claude Code backend runs in tool-free headless mode by default
+- that means Claude behaves as a model backend, not as an autonomous coding agent
+- you can still pass `--claude-mcp-config`, but with tools disabled it will not materially affect the benchmark run
+
 Each run gets its own folder, for example:
 
 ```text

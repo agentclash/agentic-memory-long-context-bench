@@ -10,7 +10,7 @@ from typing import Any
 
 from .dataset import load_dataset
 from .generator import _estimate_conversation_tokens, _estimate_text_tokens
-from .llm import GeminiJudge, GeminiModel
+from .llm import JudgeModel, create_judge, create_model
 from .memory_mode import build_memory_prompt
 from .pricing import estimate_cost_usd
 from .scoring import score_response
@@ -41,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run long-context evaluation modes against a dataset.")
     parser.add_argument("--dataset", type=Path, required=True, help="JSONL dataset path.")
     parser.add_argument("--output", type=Path, default=Path("results/latest_results.jsonl"))
+    parser.add_argument("--backend", type=str, default="gemini", choices=["gemini", "claude_code"])
+    parser.add_argument("--judge-backend", type=str, default="", choices=["", "gemini", "claude_code"])
     parser.add_argument("--model", type=str, default="gemini-2.5-flash")
     parser.add_argument("--judge-model", type=str, default="gemini-2.5-flash-lite")
     parser.add_argument("--modes", type=str, default="short_context,full_context,memory_enabled")
@@ -54,6 +56,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-backoff-seconds", type=float, default=2.0)
     parser.add_argument("--backoff-multiplier", type=float, default=2.0)
     parser.add_argument("--max-backoff-seconds", type=float, default=30.0)
+    parser.add_argument("--claude-binary", type=str, default="claude")
+    parser.add_argument("--claude-mcp-config", type=str, default="")
+    parser.add_argument("--claude-max-budget-usd", type=float, default=0.0)
     parser.add_argument("--skip-judge", action="store_true")
     parser.add_argument("--report", action="store_true")
     return parser.parse_args()
@@ -64,6 +69,8 @@ def main() -> None:
     run_harness(
         dataset_path=args.dataset,
         output_path=args.output,
+        backend=args.backend,
+        judge_backend=args.judge_backend or args.backend,
         model_name=args.model,
         judge_model_name=args.judge_model,
         modes=[mode.strip() for mode in args.modes.split(",") if mode.strip()],
@@ -77,6 +84,9 @@ def main() -> None:
         initial_backoff_seconds=args.initial_backoff_seconds,
         backoff_multiplier=args.backoff_multiplier,
         max_backoff_seconds=args.max_backoff_seconds,
+        claude_binary=args.claude_binary,
+        claude_mcp_config=args.claude_mcp_config or None,
+        claude_max_budget_usd=args.claude_max_budget_usd or None,
         use_judge=not args.skip_judge,
         print_report=args.report,
     )
@@ -86,6 +96,8 @@ def run_harness(
     *,
     dataset_path: Path,
     output_path: Path,
+    backend: str,
+    judge_backend: str,
     model_name: str,
     judge_model_name: str,
     modes: list[str],
@@ -99,6 +111,9 @@ def run_harness(
     initial_backoff_seconds: float,
     backoff_multiplier: float,
     max_backoff_seconds: float,
+    claude_binary: str,
+    claude_mcp_config: str | None,
+    claude_max_budget_usd: float | None,
     use_judge: bool,
     print_report: bool,
 ) -> list[HarnessResult]:
@@ -106,20 +121,28 @@ def run_harness(
     if limit > 0:
         examples = examples[:limit]
 
-    model = GeminiModel(
+    model = create_model(
+        backend=backend,
         model=model_name,
         max_retries=max_retries,
         initial_backoff_seconds=initial_backoff_seconds,
         backoff_multiplier=backoff_multiplier,
         max_backoff_seconds=max_backoff_seconds,
+        claude_binary=claude_binary,
+        claude_mcp_config=claude_mcp_config,
+        claude_max_budget_usd=claude_max_budget_usd,
     )
     judge = (
-        GeminiJudge(
+        create_judge(
+            backend=judge_backend,
             model=judge_model_name,
             max_retries=max_retries,
             initial_backoff_seconds=initial_backoff_seconds,
             backoff_multiplier=backoff_multiplier,
             max_backoff_seconds=max_backoff_seconds,
+            claude_binary=claude_binary,
+            claude_mcp_config=claude_mcp_config,
+            claude_max_budget_usd=claude_max_budget_usd,
         )
         if use_judge
         else None
@@ -156,18 +179,10 @@ def run_harness(
                     if judge is not None
                     else None
                 )
-                total_cost = estimate_cost_usd(
-                    model_name,
-                    input_tokens=response.input_tokens,
-                    output_tokens=response.output_tokens,
-                )
+                total_cost = _response_cost_usd(model_name, response)
                 if judge_score is not None and "_response" in judge_score:
                     judge_response = judge_score["_response"]
-                    total_cost += estimate_cost_usd(
-                        judge_model_name,
-                        input_tokens=judge_response["input_tokens"],
-                        output_tokens=judge_response["output_tokens"],
-                    )
+                    total_cost += _judge_response_cost_usd(judge_model_name, judge_response)
 
                 result = HarnessResult(
                     example_id=example.id,
@@ -335,7 +350,7 @@ def _trim_turns_to_budget(turns: list[Turn], budget: int) -> list[Turn]:
     return list(reversed(selected))
 
 
-def _judge_example(*, example: BenchmarkExample, answer: str, judge: GeminiJudge | None) -> dict[str, Any]:
+def _judge_example(*, example: BenchmarkExample, answer: str, judge: JudgeModel | None) -> dict[str, Any]:
     if judge is None:
         return {}
     prompt = (
@@ -348,6 +363,28 @@ def _judge_example(*, example: BenchmarkExample, answer: str, judge: GeminiJudge
         f"MODEL_ANSWER:\n{answer}\n"
     )
     return judge.judge(prompt=prompt)
+
+
+def _response_cost_usd(model_name: str, response: Any) -> float:
+    raw = getattr(response, "raw", {}) or {}
+    if "total_cost_usd" in raw:
+        return round(float(raw["total_cost_usd"]), 6)
+    return estimate_cost_usd(
+        model_name,
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
+    )
+
+
+def _judge_response_cost_usd(model_name: str, judge_response: dict[str, Any]) -> float:
+    raw = judge_response.get("raw") or {}
+    if "total_cost_usd" in raw:
+        return round(float(raw["total_cost_usd"]), 6)
+    return estimate_cost_usd(
+        model_name,
+        input_tokens=judge_response["input_tokens"],
+        output_tokens=judge_response["output_tokens"],
+    )
 
 
 if __name__ == "__main__":
