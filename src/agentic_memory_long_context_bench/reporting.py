@@ -101,6 +101,44 @@ def summarize_rows(rows: list[dict]) -> dict[str, ModeSummary]:
     return summaries
 
 
+def summarize_classification(rows: list[dict]) -> dict[str, float | int | str | None]:
+    memory_rows = [row for row in rows if row["mode"] == "memory_enabled" and row.get("memory_trace")]
+    traces = [
+        row["memory_trace"].get("classification", {})
+        for row in memory_rows
+        if isinstance(row.get("memory_trace"), dict)
+    ]
+    if not traces:
+        return {
+            "source": None,
+            "backend": None,
+            "total_turns": 0,
+            "evaluated_turns": 0,
+            "correct_type": 0,
+            "wrong_type": 0,
+            "missed_correction": 0,
+            "missed_procedure": 0,
+            "accuracy": 0.0,
+        }
+    total_turns = sum(int(trace.get("total_turns", 0)) for trace in traces)
+    evaluated_turns = sum(int(trace.get("evaluated_turns", 0)) for trace in traces)
+    correct_type = sum(int(trace.get("correct_type", 0)) for trace in traces)
+    wrong_type = sum(int(trace.get("wrong_type", 0)) for trace in traces)
+    missed_correction = sum(int(trace.get("missed_correction", 0)) for trace in traces)
+    missed_procedure = sum(int(trace.get("missed_procedure", 0)) for trace in traces)
+    return {
+        "source": traces[0].get("source"),
+        "backend": traces[0].get("backend"),
+        "total_turns": total_turns,
+        "evaluated_turns": evaluated_turns,
+        "correct_type": correct_type,
+        "wrong_type": wrong_type,
+        "missed_correction": missed_correction,
+        "missed_procedure": missed_procedure,
+        "accuracy": round(correct_type / evaluated_turns, 4) if evaluated_turns else 0.0,
+    }
+
+
 def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary], title: str, results_path: Path) -> dict:
     memory = summaries["memory_enabled"]
     full = summaries["full_context"]
@@ -154,6 +192,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
                 "passed": passed,
                 "pass_rate": (passed / total) if total else 0.0,
             }
+    classification_summary = summarize_classification(rows)
 
     return {
         "title": title,
@@ -167,6 +206,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
         "max_estimated_transcript_tokens": max_tokens,
         "mode_summaries": {mode: summary.to_dict() for mode, summary in summaries.items()},
         "relative_metrics": relative,
+        "classification_summary": classification_summary,
         "scenario_breakdown": scenario_breakdown,
         "sample_size_guidance": {
             "current_run_is_pilot": dataset_examples < 100,
@@ -188,6 +228,10 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
             f"memory_enabled was {relative['latency_reduction_vs_full_context_pct']:.1f}% faster on average than full_context.",
             f"full_context cost about {relative['cost_multiple_full_context_vs_memory']:.1f}x more per example than memory_enabled.",
             f"Under the current must-not-include rules, stale/forbidden-fact violation rates were {memory.hallucination_rate * 100:.1f}% for memory_enabled, {full.hallucination_rate * 100:.1f}% for full_context, and {short.hallucination_rate * 100:.1f}% for short_context.",
+            (
+                f"Memory ingestion classification accuracy was {classification_summary['accuracy'] * 100:.1f}% "
+                f"across {classification_summary['evaluated_turns']} evaluated turns."
+            ),
         ],
         "next_steps": [
             "Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.",
@@ -201,6 +245,7 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
 def render_markdown(summary_payload: dict) -> str:
     mode_summaries = summary_payload["mode_summaries"]
     relative = summary_payload["relative_metrics"]
+    classification = summary_payload["classification_summary"]
     scenarios = summary_payload["scenario_breakdown"]
     lines = [
         f"# {summary_payload['title']}",
@@ -214,6 +259,7 @@ def render_markdown(summary_payload: dict) -> str:
         f"- Model under test: `{summary_payload['model']}`",
         f"- Judge model: `{summary_payload['judge_model']}`",
         f"- Total mode runs: `{summary_payload['total_runs']}`",
+        f"- Memory ingestion: `{'oracle labels' if classification['source'] == 'oracle_labels' else 'classifier-routed'}` via `{classification['backend']}`",
         "",
         "## Results",
         "",
@@ -246,6 +292,14 @@ def render_markdown(summary_payload: dict) -> str:
     lines.extend(
         [
             "",
+            "## Ingestion Classification",
+            "",
+            f"- Source: `{classification['source']}`",
+            f"- Backend: `{classification['backend']}`",
+            f"- Accuracy: `{classification['correct_type']}/{classification['evaluated_turns']}` ({classification['accuracy'] * 100:.1f}%)",
+            f"- Missed corrections: `{classification['missed_correction']}`",
+            f"- Missed procedures: `{classification['missed_procedure']}`",
+            "",
             "## Good Enough?",
             "",
             "Yes, with boundaries. The completed run is strong enough to support a narrow claim that retrieval-based memory beats transcript stuffing on this synthetic long-context benchmark. It is not yet strong enough to support the broadest production or competitor-comparison claims.",
@@ -264,12 +318,12 @@ def render_markdown(summary_payload: dict) -> str:
             "1. Do not claim that memory reduces hallucination in a broad sense. The current failure label is really stale/forbidden-fact citation under strict must-not-include rules, not a clean fabrication metric.",
             f"2. Do not claim memory beats full context across all task types. In troubleshooting continuity, `full_context` scored `{scenarios['troubleshooting_continuity']['full_context']['pass_rate'] * 100:.1f}%` versus `{scenarios['troubleshooting_continuity']['memory_enabled']['pass_rate'] * 100:.1f}%` for `memory_enabled`.",
             f"3. Do not claim procedural memory is already a strong differentiator. On procedure reuse, `memory_enabled` scored only `{scenarios['procedure_reuse']['memory_enabled']['pass_rate'] * 100:.1f}%`.",
-            "4. Do not claim this generalizes to production as-is. The memory path still benefits from benchmark turn-kind labels at ingestion time.",
+            f"4. Do not claim this generalizes to production as-is. The memory path now depends on classification quality, which ran at `{classification['accuracy'] * 100:.1f}%` accuracy in this benchmark run.",
             "5. Do not claim this works across model families in general. The completed run used a single participant model family.",
             "",
             "## What Is Genuinely Unanswered",
             "",
-            "1. How much perfect ingestion labeling inflates the result remains the biggest open question.",
+            "1. How much ingestion classification quality drives downstream retrieval remains the biggest open question.",
             f"2. Why mixed long-context collapses so badly is unresolved: `memory_enabled` scored `{scenarios['mixed_long_context']['memory_enabled']['pass_rate'] * 100:.1f}%` there.",
             "3. Whether the semantic / episodic / procedural taxonomy itself matters is still unknown without ablations.",
             "4. This benchmark does not yet compare against actual memory products such as Mem0, Supermemory, or Zep.",
@@ -286,7 +340,7 @@ def render_markdown(summary_payload: dict) -> str:
             "| Works for all task types | Don't say it |",
             "| Procedural memory is strong | Don't say it yet |",
             "| Better than Mem0 | Can't say it |",
-            "| Works in production without labels | Can't say it |",
+            "| Works in production without labels | Directionally closer, still can't say it |",
             "",
             "## Why This Matters",
             "",

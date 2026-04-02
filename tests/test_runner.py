@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from agentic_memory_long_context_bench.generator import generate_dataset, write_dataset
+from agentic_memory_long_context_bench.reporting import build_summary_payload, summarize_rows
 from agentic_memory_long_context_bench.runner import _build_mode_prompt, _select_judged_keys, render_report
 
 
@@ -25,7 +26,9 @@ def test_memory_mode_exposes_all_memory_types(tmp_path: Path):
     assert memory_trace["stored_counts"]["semantic"] >= 1
     assert memory_trace["stored_counts"]["episodic"] >= 1
     assert memory_trace["stored_counts"]["procedural"] >= 1
+    assert memory_trace["classification"]["accuracy"] > 0
     assert prompt_metadata["mode"] == "memory_enabled"
+    assert prompt_metadata["oracle_labels"] is False
 
 
 def test_short_context_prompt_trims_turns():
@@ -62,6 +65,24 @@ def test_memory_prompt_uses_shared_answer_scaffold(tmp_path: Path):
     assert "RELEVANT_FACTS:" in prompt
     assert "ANSWER:" in prompt
     assert "Prefer newer corrected facts" in prompt
+
+
+def test_memory_mode_can_use_oracle_labels():
+    rows = generate_dataset(examples=1, seed=7)
+    example = rows[0]
+
+    _, prompt_metadata, memory_trace = _build_mode_prompt(
+        example=example,
+        mode="memory_enabled",
+        short_context_tokens=8000,
+        full_context_budget=250000,
+        oracle_labels=True,
+    )
+
+    assert memory_trace is not None
+    assert memory_trace["classification"]["source"] == "oracle_labels"
+    assert memory_trace["classification"]["accuracy"] == 1.0
+    assert prompt_metadata["oracle_labels"] is True
 
 
 def test_select_judged_keys_uses_balanced_ratio():
@@ -118,3 +139,72 @@ def test_render_report_includes_judged_rows():
 
     report = render_report(results)
     assert "judged_rows: 1/2 (50.0%)" in report
+
+
+def test_summary_payload_includes_classification_metrics():
+    rows = [
+        {
+            "example_id": "profile_recall_easy_0000",
+            "mode": "memory_enabled",
+            "model": "gemini-2.5-flash-lite",
+            "judge_model": "gemini-3-flash-preview",
+            "latency_ms": 100.0,
+            "prompt_tokens": 10,
+            "cost_usd": 0.001,
+            "response_text": "ok",
+            "rule_score": {"passed": True, "hallucination_flag": False},
+            "judge_score": {"overall_score": 0.8},
+            "prompt_metadata": {"estimated_transcript_tokens": 100},
+            "memory_trace": {
+                "classification": {
+                    "source": "classifier",
+                    "backend": "HeuristicTurnClassifier",
+                    "total_turns": 5,
+                    "evaluated_turns": 4,
+                    "correct_type": 3,
+                    "wrong_type": 1,
+                    "missed_correction": 1,
+                    "missed_procedure": 0,
+                    "accuracy": 0.75,
+                }
+            },
+        },
+        {
+            "example_id": "profile_recall_easy_0000",
+            "mode": "full_context",
+            "model": "gemini-2.5-flash-lite",
+            "judge_model": "gemini-3-flash-preview",
+            "latency_ms": 120.0,
+            "prompt_tokens": 20,
+            "cost_usd": 0.002,
+            "response_text": "ok",
+            "rule_score": {"passed": False, "hallucination_flag": False},
+            "judge_score": {"overall_score": 0.6},
+            "prompt_metadata": {"estimated_transcript_tokens": 100},
+            "memory_trace": None,
+        },
+        {
+            "example_id": "profile_recall_easy_0000",
+            "mode": "short_context",
+            "model": "gemini-2.5-flash-lite",
+            "judge_model": "gemini-3-flash-preview",
+            "latency_ms": 80.0,
+            "prompt_tokens": 5,
+            "cost_usd": 0.0005,
+            "response_text": "ok",
+            "rule_score": {"passed": False, "hallucination_flag": False},
+            "judge_score": {"overall_score": 0.4},
+            "prompt_metadata": {"estimated_transcript_tokens": 100},
+            "memory_trace": None,
+        },
+    ]
+
+    payload = build_summary_payload(
+        rows=rows,
+        summaries=summarize_rows(rows),
+        title="Test",
+        results_path=Path("results.jsonl"),
+    )
+
+    assert payload["classification_summary"]["accuracy"] == 0.75
+    assert "classification accuracy was 75.0%" in payload["key_findings"][-1]

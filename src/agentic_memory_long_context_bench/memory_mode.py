@@ -4,14 +4,23 @@ import os
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from agentic_memory import Memory
 
 from .deterministic import HashingEmbedder
 from .generator import _estimate_text_tokens
+from .llm import ClassificationResult, ClassifierLLM, TurnClassifier
 from .schema import BenchmarkExample, Turn
 from .vocab import PROCEDURES
+
+
+class MemoryAdapter(Protocol):
+    def ingest(self, *, turn: Turn) -> None:
+        """Ingest a raw conversation turn into the adapter's memory system."""
+
+    def recall(self, *, query: str) -> dict[str, list[Any]]:
+        """Return retrieved memory buckets for prompt construction."""
 
 
 @dataclass(frozen=True)
@@ -21,12 +30,18 @@ class MemoryTrace:
     episodic_recent: list[dict[str, Any]]
     procedural: list[dict[str, Any]]
     stored_counts: dict[str, int]
+    classification: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def build_memory_prompt(example: BenchmarkExample) -> tuple[str, MemoryTrace]:
+def build_memory_prompt(
+    example: BenchmarkExample,
+    *,
+    classifier_model: str | None = None,
+    oracle_labels: bool = False,
+) -> tuple[str, MemoryTrace]:
     with tempfile.TemporaryDirectory(prefix="long_context_harness_") as chroma_dir:
         with tempfile.TemporaryDirectory(prefix="long_context_media_") as media_dir:
             memory_kwargs: dict[str, Any] = {
@@ -38,12 +53,21 @@ def build_memory_prompt(example: BenchmarkExample) -> tuple[str, MemoryTrace]:
                 memory_kwargs["embedding_dimensions"] = 64
 
             memory = Memory(**memory_kwargs)
-            state = _ingest_example(memory, example)
+            classifier = _build_classifier(classifier_model=classifier_model, oracle_labels=oracle_labels)
+            adapter = AgenticMemoryAdapter(
+                memory=memory,
+                example=example,
+                classifier=classifier,
+                oracle_labels=oracle_labels,
+            )
+            for turn in example.conversation:
+                adapter.ingest(turn=turn)
 
-            semantic_results = memory.recall(example.task.prompt, top_k=6, types=["semantic"])
-            episodic_ranked = memory.recall(example.task.prompt, top_k=6, types=["episodic"])
-            episodic_recent = memory.recall_episodes(mode="recent", limit=6)
-            procedural_matches = memory.recall_procedures(example.task.prompt, top_k=3)
+            recalled = adapter.recall(query=example.task.prompt)
+            semantic_results = recalled["semantic"]
+            episodic_ranked = recalled["episodic_ranked"]
+            episodic_recent = recalled["episodic_recent"]
+            procedural_matches = recalled["procedural"]
 
             prompt = _format_memory_prompt(
                 example=example,
@@ -57,57 +81,204 @@ def build_memory_prompt(example: BenchmarkExample) -> tuple[str, MemoryTrace]:
                 episodic_ranked=[_ranked_result_to_dict(result) for result in episodic_ranked],
                 episodic_recent=[_record_to_dict(record) for record in episodic_recent],
                 procedural=[_procedural_match_to_dict(match) for match in procedural_matches],
-                stored_counts=state["stored_counts"],
+                stored_counts=adapter.stored_counts,
+                classification=adapter.classification_summary(),
             )
             return prompt, trace
 
 
-def _ingest_example(memory: Memory, example: BenchmarkExample) -> dict[str, Any]:
-    stored_counts = {"semantic": 0, "episodic": 0, "procedural": 0}
-    semantic_field_map: dict[str, str] = {}
-    fact_id_to_memory_id: dict[str, str] = {}
+class AgenticMemoryAdapter:
+    def __init__(
+        self,
+        *,
+        memory: Memory,
+        example: BenchmarkExample,
+        classifier: TurnClassifier,
+        oracle_labels: bool,
+    ):
+        self.memory = memory
+        self.example = example
+        self.classifier = classifier
+        self.oracle_labels = oracle_labels
+        self.stored_counts = {"semantic": 0, "episodic": 0, "procedural": 0}
+        self.semantic_field_map: dict[str, str] = {}
+        self.fact_id_to_memory_id: dict[str, str] = {}
+        self.classification_rows: list[dict[str, Any]] = []
 
-    for turn in example.conversation:
-        if turn.kind in {"durable_fact", "correction"}:
-            field_name = _infer_semantic_field(turn.text)
-            supersedes = semantic_field_map.get(field_name) if turn.kind == "correction" and field_name else None
-            memory_id = memory.remember(
-                turn.text,
-                category=_semantic_category(turn.text),
-                domain="long_context_bench",
-                supersedes=supersedes,
-                metadata={"turn_index": turn.turn_index, "kind": turn.kind, "field": field_name},
-            )
-            stored_counts["semantic"] += 1
-            if turn.fact_id:
-                fact_id_to_memory_id[turn.fact_id] = memory_id
-            if field_name:
-                semantic_field_map[field_name] = memory_id
-            continue
+    def ingest(self, *, turn: Turn) -> None:
+        classification = (
+            _classify_turn_with_oracle(turn)
+            if self.oracle_labels
+            else self.classifier.classify(role=turn.role, text=turn.text)
+        )
+        self.classification_rows.append(
+            {
+                "turn_index": turn.turn_index,
+                "role": turn.role,
+                "oracle_kind": turn.kind,
+                "predicted_type": classification.type,
+                "field": classification.field,
+                "supersedes_description": classification.supersedes_description,
+            }
+        )
 
-        if turn.kind in {"event", "attempted_step", "ack"}:
-            memory.remember_episode(
+        if classification.type in {"fact", "correction"}:
+            self._store_semantic(turn=turn, classification=classification)
+            return
+        if classification.type == "event":
+            self.memory.remember_episode(
                 turn.text,
-                session=example.id,
+                session=self.example.id,
                 turn=turn.turn_index,
                 participants=[turn.role],
                 summary=turn.kind,
-                metadata={"turn_index": turn.turn_index, "kind": turn.kind},
+                metadata={
+                    "turn_index": turn.turn_index,
+                    "kind": turn.kind,
+                    "classified_type": classification.type,
+                },
             )
-            stored_counts["episodic"] += 1
-            continue
-
-        if turn.kind == "procedure_outcome":
-            procedure = PROCEDURES[example.metadata["procedure_key"]]
-            memory.remember_procedure(
+            self.stored_counts["episodic"] += 1
+            return
+        if classification.type == "procedure":
+            procedure = PROCEDURES[self.example.metadata["procedure_key"]]
+            self.memory.remember_procedure(
                 turn.text,
                 steps=list(procedure["steps"]),
                 importance=0.9,
-                metadata={"turn_index": turn.turn_index, "kind": turn.kind, "procedure_key": example.metadata["procedure_key"]},
+                metadata={
+                    "turn_index": turn.turn_index,
+                    "kind": turn.kind,
+                    "classified_type": classification.type,
+                    "procedure_key": self.example.metadata["procedure_key"],
+                },
             )
-            stored_counts["procedural"] += 1
+            self.stored_counts["procedural"] += 1
 
-    return {"stored_counts": stored_counts, "fact_id_to_memory_id": fact_id_to_memory_id}
+    def recall(self, *, query: str) -> dict[str, list[Any]]:
+        return {
+            "semantic": self.memory.recall(query, top_k=6, types=["semantic"]),
+            "episodic_ranked": self.memory.recall(query, top_k=6, types=["episodic"]),
+            "episodic_recent": self.memory.recall_episodes(mode="recent", limit=6),
+            "procedural": self.memory.recall_procedures(query, top_k=3),
+        }
+
+    def classification_summary(self) -> dict[str, Any]:
+        totals = {
+            "total_turns": len(self.classification_rows),
+            "correct_type": 0,
+            "wrong_type": 0,
+            "missed_correction": 0,
+            "missed_procedure": 0,
+            "source": "oracle_labels" if self.oracle_labels else "classifier",
+            "backend": "oracle" if self.oracle_labels else self.classifier.__class__.__name__,
+        }
+        for row in self.classification_rows:
+            expected_type = _expected_classification_type(row["oracle_kind"])
+            if expected_type is None:
+                continue
+            if row["predicted_type"] == expected_type:
+                totals["correct_type"] += 1
+            else:
+                totals["wrong_type"] += 1
+                if expected_type == "correction" and row["predicted_type"] == "fact":
+                    totals["missed_correction"] += 1
+                if expected_type == "procedure" and row["predicted_type"] == "noise":
+                    totals["missed_procedure"] += 1
+        classified_total = totals["correct_type"] + totals["wrong_type"]
+        totals["evaluated_turns"] = classified_total
+        totals["accuracy"] = round(totals["correct_type"] / classified_total, 4) if classified_total else 0.0
+        totals["rows"] = self.classification_rows
+        return totals
+
+    def _store_semantic(self, *, turn: Turn, classification: ClassificationResult) -> None:
+        field_name = classification.field or _infer_semantic_field(turn.text)
+        supersedes = None
+        if classification.type == "correction" and field_name:
+            supersedes = self.semantic_field_map.get(field_name)
+        memory_id = self.memory.remember(
+            turn.text,
+            category=_semantic_category(turn.text, field=field_name),
+            domain="long_context_bench",
+            supersedes=supersedes,
+            metadata={
+                "turn_index": turn.turn_index,
+                "kind": turn.kind,
+                "classified_type": classification.type,
+                "field": field_name,
+                "supersedes_description": classification.supersedes_description,
+            },
+        )
+        self.stored_counts["semantic"] += 1
+        if turn.fact_id:
+            self.fact_id_to_memory_id[turn.fact_id] = memory_id
+        if field_name:
+            self.semantic_field_map[field_name] = memory_id
+
+
+def _build_classifier(*, classifier_model: str | None, oracle_labels: bool) -> TurnClassifier:
+    if oracle_labels:
+        return HeuristicTurnClassifier()
+    if os.getenv("GEMINI_API_KEY"):
+        return ClassifierLLM(model=classifier_model or "gemini-2.5-flash-lite")
+    return HeuristicTurnClassifier()
+
+
+class HeuristicTurnClassifier:
+    def classify(self, *, role: str, text: str) -> ClassificationResult:
+        lowered = text.lower()
+        if role == "assistant" and "previous successful procedure" in lowered:
+            return ClassificationResult(
+                type="procedure",
+                field=None,
+                supersedes_description=None,
+                raw={"backend": "heuristic"},
+            )
+        if lowered.startswith("correction:"):
+            return ClassificationResult(
+                type="correction",
+                field=_infer_semantic_field(text),
+                supersedes_description=_infer_semantic_field(text),
+                raw={"backend": "heuristic"},
+            )
+        if any(marker in lowered for marker in ("my issue is", "i already tried")):
+            return ClassificationResult(
+                type="event",
+                field=None,
+                supersedes_description=None,
+                raw={"backend": "heuristic"},
+            )
+        if role == "user" and _looks_like_fact(lowered):
+            field = _infer_semantic_field(text)
+            return ClassificationResult(
+                type="fact",
+                field=field,
+                supersedes_description=None,
+                raw={"backend": "heuristic"},
+            )
+        return ClassificationResult(
+            type="noise",
+            field=None,
+            supersedes_description=None,
+            raw={"backend": "heuristic"},
+        )
+
+
+def _classify_turn_with_oracle(turn: Turn) -> ClassificationResult:
+    mapping = {
+        "durable_fact": "fact",
+        "correction": "correction",
+        "event": "event",
+        "attempted_step": "event",
+        "ack": "noise",
+        "procedure_outcome": "procedure",
+    }
+    return ClassificationResult(
+        type=mapping.get(turn.kind, "noise"),
+        field=_infer_semantic_field(turn.text) if turn.kind in {"durable_fact", "correction"} else None,
+        supersedes_description=_infer_semantic_field(turn.text) if turn.kind == "correction" else None,
+        raw={"backend": "oracle", "kind": turn.kind},
+    )
 
 
 def _format_memory_prompt(
@@ -165,22 +336,48 @@ def _infer_semantic_field(text: str) -> str:
         return "plan"
     if "timezone" in lowered:
         return "timezone"
-    if "theme" in lowered:
-        return "theme"
-    if "notifications" in lowered:
-        return "notifications"
+    if "theme" in lowered or "notifications" in lowered:
+        return "preference"
     if "i use a" in lowered:
         return "device"
     return "general"
 
 
-def _semantic_category(text: str) -> str:
-    field = _infer_semantic_field(text)
+def _semantic_category(text: str, *, field: str | None = None) -> str:
+    field = field or _infer_semantic_field(text)
     if field in {"name", "plan", "timezone", "device"}:
         return "profile"
-    if field in {"theme", "notifications"}:
+    if field == "preference":
         return "preference"
     return "general"
+
+
+def _looks_like_fact(lowered: str) -> bool:
+    return any(
+        marker in lowered
+        for marker in (
+            "my name is",
+            "i'm on the",
+            "my timezone is",
+            "i prefer the",
+            "i use a",
+            "i prefer ",
+        )
+    )
+
+
+def _expected_classification_type(kind: str) -> str | None:
+    if kind == "durable_fact":
+        return "fact"
+    if kind == "correction":
+        return "correction"
+    if kind in {"event", "attempted_step"}:
+        return "event"
+    if kind == "procedure_outcome":
+        return "procedure"
+    if kind in {"ack", "distractor", "distractor_block"}:
+        return "noise"
+    return None
 
 
 def _ranked_result_to_dict(result: Any) -> dict[str, Any]:

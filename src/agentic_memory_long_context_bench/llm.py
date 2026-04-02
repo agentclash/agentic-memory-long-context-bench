@@ -14,12 +14,28 @@ class GenerativeModel(Protocol):
         ...
 
 
+class TurnClassifier(Protocol):
+    def classify(self, *, role: str, text: str) -> "ClassificationResult":
+        ...
+
+
 @dataclass(frozen=True)
 class ModelResponse:
     text: str
     input_tokens: int
     output_tokens: int
     latency_ms: float
+    raw: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ClassificationResult:
+    type: str
+    field: str | None
+    supersedes_description: str | None
     raw: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
@@ -92,6 +108,50 @@ class GeminiJudge:
         payload = _extract_json_object(response.text)
         payload["_response"] = response.to_dict()
         return payload
+
+
+class ClassifierLLM:
+    def __init__(self, *, model: str, **kwargs: Any):
+        self._model = GeminiModel(model=model, **kwargs)
+
+    def classify(self, *, role: str, text: str) -> ClassificationResult:
+        prompt = (
+            "Classify a support-conversation message for memory ingestion.\n"
+            "Choose exactly one type from: fact, correction, event, procedure, noise.\n"
+            "Definitions:\n"
+            '- fact: a durable statement about the user such as name, plan, timezone, device, or preference\n'
+            '- correction: an update that supersedes an earlier durable fact\n'
+            '- event: a temporal issue report, action the user took, or troubleshooting attempt\n'
+            '- procedure: a reusable troubleshooting workflow or recipe\n'
+            '- noise: acknowledgements, filler, or irrelevant chatter\n\n'
+            "Also extract:\n"
+            '- field: one of name, plan, timezone, device, preference, general, or null when not applicable\n'
+            "- supersedes_description: brief description of the earlier fact being corrected, or null\n\n"
+            f"ROLE: {role}\n"
+            f"MESSAGE: {text}\n\n"
+            'Return strict JSON with keys "type", "field", and "supersedes_description".'
+        )
+        response = self._model.generate(prompt=prompt)
+        payload = _extract_json_object(response.text)
+        result_type = str(payload.get("type", "")).strip().lower()
+        field = payload.get("field")
+        supersedes_description = payload.get("supersedes_description")
+        normalized_field = str(field).strip().lower() if isinstance(field, str) and field.strip() else None
+        normalized_supersedes = (
+            str(supersedes_description).strip()
+            if isinstance(supersedes_description, str) and supersedes_description.strip()
+            else None
+        )
+        if result_type not in {"fact", "correction", "event", "procedure", "noise"}:
+            result_type = "noise"
+        if normalized_field not in {"name", "plan", "timezone", "device", "preference", "general"}:
+            normalized_field = None
+        return ClassificationResult(
+            type=result_type,
+            field=normalized_field,
+            supersedes_description=normalized_supersedes,
+            raw={"model": self._model.model, "response": response.to_dict(), "payload": payload},
+        )
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
