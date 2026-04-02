@@ -118,6 +118,10 @@ def summarize_classification(rows: list[dict]) -> dict[str, float | int | str | 
             "wrong_type": 0,
             "missed_correction": 0,
             "missed_procedure": 0,
+            "parse_errors": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost_usd": 0.0,
             "accuracy": 0.0,
         }
     total_turns = sum(int(trace.get("total_turns", 0)) for trace in traces)
@@ -126,6 +130,10 @@ def summarize_classification(rows: list[dict]) -> dict[str, float | int | str | 
     wrong_type = sum(int(trace.get("wrong_type", 0)) for trace in traces)
     missed_correction = sum(int(trace.get("missed_correction", 0)) for trace in traces)
     missed_procedure = sum(int(trace.get("missed_procedure", 0)) for trace in traces)
+    parse_errors = sum(int(trace.get("parse_errors", 0)) for trace in traces)
+    input_tokens = sum(int(trace.get("tokens", {}).get("input", 0)) for trace in traces)
+    output_tokens = sum(int(trace.get("tokens", {}).get("output", 0)) for trace in traces)
+    cost_usd = sum(float(trace.get("cost_usd", 0.0)) for trace in traces)
     return {
         "source": traces[0].get("source"),
         "backend": traces[0].get("backend"),
@@ -135,6 +143,10 @@ def summarize_classification(rows: list[dict]) -> dict[str, float | int | str | 
         "wrong_type": wrong_type,
         "missed_correction": missed_correction,
         "missed_procedure": missed_procedure,
+        "parse_errors": parse_errors,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd": round(cost_usd, 6),
         "accuracy": round(correct_type / evaluated_turns, 4) if evaluated_turns else 0.0,
     }
 
@@ -232,6 +244,10 @@ def build_summary_payload(*, rows: list[dict], summaries: dict[str, ModeSummary]
                 f"Memory ingestion classification accuracy was {classification_summary['accuracy'] * 100:.1f}% "
                 f"across {classification_summary['evaluated_turns']} evaluated turns."
             ),
+            (
+                f"Classifier routing added {classification_summary['input_tokens'] + classification_summary['output_tokens']} "
+                f"tokens and ${classification_summary['cost_usd']:.6f} of ingestion cost across memory-enabled rows."
+            ),
         ],
         "next_steps": [
             "Tighten the memory-mode answer format so the model is pushed to cite all retrieved facts that satisfy the gold constraints.",
@@ -299,6 +315,9 @@ def render_markdown(summary_payload: dict) -> str:
             f"- Accuracy: `{classification['correct_type']}/{classification['evaluated_turns']}` ({classification['accuracy'] * 100:.1f}%)",
             f"- Missed corrections: `{classification['missed_correction']}`",
             f"- Missed procedures: `{classification['missed_procedure']}`",
+            f"- Parse errors: `{classification['parse_errors']}`",
+            f"- Classifier tokens: `{classification['input_tokens']}` in / `{classification['output_tokens']}` out",
+            f"- Classifier cost: `${classification['cost_usd']:.6f}`",
             "",
             "## Good Enough?",
             "",

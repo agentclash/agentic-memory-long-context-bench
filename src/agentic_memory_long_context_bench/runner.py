@@ -194,6 +194,10 @@ def run_harness(
                         input_tokens=judge_response["input_tokens"],
                         output_tokens=judge_response["output_tokens"],
                     )
+                if memory_trace is not None:
+                    total_cost += float(
+                        memory_trace.get("classification", {}).get("cost_usd", 0.0)
+                    )
 
                 result = HarnessResult(
                     example_id=example.id,
@@ -332,6 +336,7 @@ def _build_mode_prompt(
                 "oracle_labels": oracle_labels,
                 "classifier_model": classifier_model,
                 "classification": memory_trace.classification,
+                "classification_cost_usd": memory_trace.classification.get("cost_usd", 0.0),
             },
             memory_trace.to_dict(),
         )

@@ -132,7 +132,7 @@ class ClassifierLLM:
             'Return strict JSON with keys "type", "field", and "supersedes_description".'
         )
         response = self._model.generate(prompt=prompt)
-        payload = _extract_json_object(response.text)
+        payload = _extract_classifier_payload(response.text)
         result_type = str(payload.get("type", "")).strip().lower()
         field = payload.get("field")
         supersedes_description = payload.get("supersedes_description")
@@ -150,7 +150,12 @@ class ClassifierLLM:
             type=result_type,
             field=normalized_field,
             supersedes_description=normalized_supersedes,
-            raw={"model": self._model.model, "response": response.to_dict(), "payload": payload},
+            raw={
+                "model": self._model.model,
+                "response": response.to_dict(),
+                "payload": payload,
+                "parse_error": bool(payload.get("_parse_error")),
+            },
         )
 
 
@@ -175,6 +180,19 @@ def _extract_json_object(text: str) -> dict[str, Any]:
             "hallucination": True,
             "reasoning": "Judge JSON parse failed.",
         }
+
+
+def _extract_classifier_payload(text: str) -> dict[str, Any]:
+    payload = _extract_json_object(text)
+    if "type" in payload:
+        return payload
+    return {
+        "type": "noise",
+        "field": None,
+        "supersedes_description": None,
+        "_parse_error": True,
+        "_raw_text": text[:200],
+    }
 
 
 def _is_retryable_exception(exc: Exception) -> bool:
