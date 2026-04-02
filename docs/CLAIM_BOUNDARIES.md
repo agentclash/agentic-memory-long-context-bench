@@ -34,15 +34,15 @@ This file captures what the completed `n=300` benchmark supports, what it does n
    It helps, but it is not solved. On procedure reuse, `memory_enabled` scored `18/60` (`30.0%`) while `full_context` scored `0/60`.
 
 4. "This generalizes to production."
-   The benchmark memory path still benefits from benchmark turn-kind labels at ingestion time.
+   The benchmark now routes ingestion through a classifier, which is directionally closer to production, but the result still depends on benchmark-specific prompt engineering and measured classification accuracy.
 
 5. "This works across models."
    The completed run used a single participant model family: `gemini-2.5-flash-lite`.
 
 ## What Is Genuinely Unanswered
 
-1. How much perfect ingestion labeling inflates the result.
-   This is still the biggest open question.
+1. How much ingestion classification quality drives downstream retrieval.
+   This is still the biggest open question, even after removing oracle routing as the default path.
 
 2. Why mixed long-context collapses.
    `memory_enabled` scored only `1/60` (`1.7%`) there.
@@ -66,4 +66,4 @@ This file captures what the completed `n=300` benchmark supports, what it does n
 | Works for all task types | Don't say it |
 | Procedural memory is strong | Don't say it yet |
 | Better than Mem0 | Can't say it |
-| Works in production without labels | Can't say it |
+| Works in production without labels | Directionally closer, still can't say it |

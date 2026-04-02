@@ -59,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--judge-sample-size", type=int, default=0)
     parser.add_argument("--judge-random-seed", type=int, default=7)
     parser.add_argument("--skip-judge", action="store_true")
+    parser.add_argument("--oracle-labels", action="store_true", help="Use benchmark labels for memory ingestion instead of classifier routing.")
+    parser.add_argument("--classifier-model", type=str, default="", help="Optional model for memory-ingestion classification. Defaults to the participant model.")
     parser.add_argument("--report", action="store_true")
     return parser.parse_args()
 
@@ -85,6 +87,8 @@ def main() -> None:
         judge_sample_size=args.judge_sample_size,
         judge_random_seed=args.judge_random_seed,
         use_judge=not args.skip_judge,
+        oracle_labels=args.oracle_labels,
+        classifier_model_name=args.classifier_model,
         print_report=args.report,
     )
 
@@ -110,6 +114,8 @@ def run_harness(
     judge_sample_size: int,
     judge_random_seed: int,
     use_judge: bool,
+    oracle_labels: bool,
+    classifier_model_name: str,
     print_report: bool,
 ) -> list[HarnessResult]:
     examples = load_dataset(dataset_path)
@@ -166,6 +172,8 @@ def run_harness(
                     mode=mode,
                     short_context_tokens=short_context_tokens,
                     full_context_budget=full_context_budget,
+                    oracle_labels=oracle_labels,
+                    classifier_model=classifier_model_name or model_name,
                 )
                 response = model.generate(prompt=prompt)
                 rule_score = score_response(example, response.text)
@@ -185,6 +193,10 @@ def run_harness(
                         judge_model_name,
                         input_tokens=judge_response["input_tokens"],
                         output_tokens=judge_response["output_tokens"],
+                    )
+                if memory_trace is not None:
+                    total_cost += float(
+                        memory_trace.get("classification", {}).get("cost_usd", 0.0)
                     )
 
                 result = HarnessResult(
@@ -296,6 +308,8 @@ def _build_mode_prompt(
     mode: str,
     short_context_tokens: int,
     full_context_budget: int,
+    oracle_labels: bool = False,
+    classifier_model: str | None = None,
 ) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
     if mode == "short_context":
         turns = _trim_turns_to_budget(example.conversation, short_context_tokens)
@@ -308,13 +322,21 @@ def _build_mode_prompt(
         return prompt, {"mode": mode, "included_turns": len(turns), "context_budget": full_context_budget}, None
 
     if mode == "memory_enabled":
-        prompt, memory_trace = build_memory_prompt(example)
+        prompt, memory_trace = build_memory_prompt(
+            example,
+            classifier_model=classifier_model,
+            oracle_labels=oracle_labels,
+        )
         return (
             prompt,
             {
                 "mode": mode,
                 "estimated_transcript_tokens": example.metadata.get("estimated_transcript_tokens"),
                 "stored_counts": memory_trace.stored_counts,
+                "oracle_labels": oracle_labels,
+                "classifier_model": classifier_model,
+                "classification": memory_trace.classification,
+                "classification_cost_usd": memory_trace.classification.get("cost_usd", 0.0),
             },
             memory_trace.to_dict(),
         )
